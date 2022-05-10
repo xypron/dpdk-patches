@@ -1,0 +1,1788 @@
+From cee1c1193c3e72aba2d2d5caec84ffa505f7d455 Mon Sep 17 00:00:00 2001
+From: Michal Mazurek <maz@semihalf.com>
+Date: Thu, 5 May 2022 19:29:55 +0200
+Subject: [PATCH 1/1] eal: add initial support for RISC-V architecture
+
+Add all necessary elements for DPDK to compile and run EAL on SiFive
+Freedom U740 SoC which is based on SiFive U74-MC (ISA: rv64imafdc)
+core complex.
+
+This includes:
+
+- EAL library implementation for rv64imafdc ISA.
+- meson build structure for 'riscv' architecture. RTE_ARCH_RISCV define
+  is added for architecture identification.
+- xmm_t structure operation stubs as there is no vector support in the
+  U74 core.
+
+Compilation was tested on Ubuntu and Arch Linux using riscv64 toolchain.
+
+Two rte_rdtsc() schemes are provided: stable low-resolution using rdtime
+(default) and unstable high-resolution using rdcycle. User can override
+the scheme by defining RTE_RISCV_RDTSC_USE_HPM=1 during compile time of
+both DPDK and the application. The reasoning for this is as follows.
+The RISC-V ISA mandates that clock read by rdtime has to be of constant
+period and synchronized between all hardware threads within 1 tick
+(chapter 10.1 in version 20191213 of RISC-V spec).
+However this clock may not be of high-enough frequency for dataplane
+uses. I.e. on HiFive Unmatched (FU740) it is 1MHz.
+There is a high-resolution alternative in form of rdcycle which is
+clocked at the core clock frequency. The drawbacks are that it may be
+disabled during sleep (WFI) and its frequency might change due to DVFS.
+
+The platform is currently marked as linux-only because rte_cycles
+implementation uses the timebase-frequency device-tree node read through
+the proc file system. Such approach was chosen because Linux kernel
+depends on the presence of this device-tree node.
+
+The compilation of following modules has been disabled by this commit
+and will be re-enabled in later commits as fixes are introduced:
+net/ixgbe, net/memif, net/tap, example/l3fwd.
+
+Known checkpatch errors/warnings:
+
+- ERROR:COMPLEX_MACRO in rte_atomic.h and rte_cycles.h due to inline
+  assembly declarations.
+- vector_size compiler attribute used in rte_vect.h directly.
+- rte_*mb() used directly in rte_atomic.h to reduce code duplication.
+- __atomic_thread_fence() used to implement rte_atomic_thread_fence().
+
+Signed-off-by: Michal Mazurek <maz@semihalf.com>
+Signed-off-by: Stanislaw Kardach <kda@semihalf.com>
+Sponsored-by: Frank Zhao <Frank.Zhao@starfivetech.com>
+Sponsored-by: Sam Grove <sam.grove@sifive.com>
+---
+ MAINTAINERS                                   |   6 +
+ app/test/test_xmmt_ops.h                      |  16 ++
+ config/meson.build                            |   2 +
+ config/riscv/meson.build                      | 143 ++++++++++++++++++
+ config/riscv/riscv64_linux_gcc                |  17 +++
+ config/riscv/riscv64_sifive_u740_linux_gcc    |  19 +++
+ doc/guides/contributing/design.rst            |   2 +-
+ .../linux_gsg/cross_build_dpdk_for_riscv.rst  | 125 +++++++++++++++
+ doc/guides/linux_gsg/index.rst                |   1 +
+ doc/guides/nics/features.rst                  |   5 +
+ doc/guides/nics/features/default.ini          |   1 +
+ doc/guides/rel_notes/release_22_07.rst        |  23 +++
+ drivers/net/i40e/meson.build                  |   6 +
+ drivers/net/ixgbe/meson.build                 |   6 +
+ drivers/net/memif/meson.build                 |   5 +
+ drivers/net/tap/meson.build                   |   5 +
+ examples/l3fwd/meson.build                    |   6 +
+ lib/eal/riscv/include/meson.build             |  23 +++
+ lib/eal/riscv/include/rte_atomic.h            |  52 +++++++
+ lib/eal/riscv/include/rte_byteorder.h         |  44 ++++++
+ lib/eal/riscv/include/rte_cpuflags.h          |  55 +++++++
+ lib/eal/riscv/include/rte_cycles.h            | 103 +++++++++++++
+ lib/eal/riscv/include/rte_io.h                |  21 +++
+ lib/eal/riscv/include/rte_mcslock.h           |  18 +++
+ lib/eal/riscv/include/rte_memcpy.h            |  63 ++++++++
+ lib/eal/riscv/include/rte_pause.h             |  31 ++++
+ lib/eal/riscv/include/rte_pflock.h            |  17 +++
+ lib/eal/riscv/include/rte_power_intrinsics.h  |  22 +++
+ lib/eal/riscv/include/rte_prefetch.h          |  50 ++++++
+ lib/eal/riscv/include/rte_rwlock.h            |  44 ++++++
+ lib/eal/riscv/include/rte_spinlock.h          |  67 ++++++++
+ lib/eal/riscv/include/rte_ticketlock.h        |  21 +++
+ lib/eal/riscv/include/rte_vect.h              |  55 +++++++
+ lib/eal/riscv/meson.build                     |  11 ++
+ lib/eal/riscv/rte_cpuflags.c                  | 122 +++++++++++++++
+ lib/eal/riscv/rte_cycles.c                    |  77 ++++++++++
+ lib/eal/riscv/rte_hypervisor.c                |  13 ++
+ lib/eal/riscv/rte_power_intrinsics.c          |  56 +++++++
+ meson.build                                   |   2 +
+ 39 files changed, 1354 insertions(+), 1 deletion(-)
+ create mode 100644 config/riscv/meson.build
+ create mode 100644 config/riscv/riscv64_linux_gcc
+ create mode 100644 config/riscv/riscv64_sifive_u740_linux_gcc
+ create mode 100644 doc/guides/linux_gsg/cross_build_dpdk_for_riscv.rst
+ create mode 100644 lib/eal/riscv/include/meson.build
+ create mode 100644 lib/eal/riscv/include/rte_atomic.h
+ create mode 100644 lib/eal/riscv/include/rte_byteorder.h
+ create mode 100644 lib/eal/riscv/include/rte_cpuflags.h
+ create mode 100644 lib/eal/riscv/include/rte_cycles.h
+ create mode 100644 lib/eal/riscv/include/rte_io.h
+ create mode 100644 lib/eal/riscv/include/rte_mcslock.h
+ create mode 100644 lib/eal/riscv/include/rte_memcpy.h
+ create mode 100644 lib/eal/riscv/include/rte_pause.h
+ create mode 100644 lib/eal/riscv/include/rte_pflock.h
+ create mode 100644 lib/eal/riscv/include/rte_power_intrinsics.h
+ create mode 100644 lib/eal/riscv/include/rte_prefetch.h
+ create mode 100644 lib/eal/riscv/include/rte_rwlock.h
+ create mode 100644 lib/eal/riscv/include/rte_spinlock.h
+ create mode 100644 lib/eal/riscv/include/rte_ticketlock.h
+ create mode 100644 lib/eal/riscv/include/rte_vect.h
+ create mode 100644 lib/eal/riscv/meson.build
+ create mode 100644 lib/eal/riscv/rte_cpuflags.c
+ create mode 100644 lib/eal/riscv/rte_cycles.c
+ create mode 100644 lib/eal/riscv/rte_hypervisor.c
+ create mode 100644 lib/eal/riscv/rte_power_intrinsics.c
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7c4f541dba..2c732a1912 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -296,6 +296,12 @@ F: drivers/*/*/*_altivec.*
+ F: app/*/*_altivec.*
+ F: examples/*/*_altivec.*
+ 
++RISC-V
++M: Stanislaw Kardach <kda@semihalf.com>
++F: config/riscv/
++F: doc/guides/linux_gsg/cross_build_dpdk_for_riscv.rst
++F: lib/eal/riscv/
++
+ Intel x86
+ M: Bruce Richardson <bruce.richardson@intel.com>
+ M: Konstantin Ananyev <konstantin.ananyev@intel.com>
+diff --git a/app/test/test_xmmt_ops.h b/app/test/test_xmmt_ops.h
+index 3a82d5ecac..55f256599e 100644
+--- a/app/test/test_xmmt_ops.h
++++ b/app/test/test_xmmt_ops.h
+@@ -1,5 +1,8 @@
+ /* SPDX-License-Identifier: BSD-3-Clause
+  * Copyright(c) 2015 Cavium, Inc
++ * Copyright(c) 2022 StarFive
++ * Copyright(c) 2022 SiFive
++ * Copyright(c) 2022 Semihalf
+  */
+ 
+ #ifndef _TEST_XMMT_OPS_H_
+@@ -49,6 +52,19 @@ vect_set_epi32(int i3, int i2, int i1, int i0)
+ 	return data;
+ }
+ 
++#elif defined(RTE_ARCH_RISCV)
++
++#define vect_loadu_sil128(p) vect_load_128(p)
++
++/* sets the 4 signed 32-bit integer values and returns the xmm_t variable */
++static __rte_always_inline xmm_t
++vect_set_epi32(int i3, int i2, int i1, int i0)
++{
++	xmm_t data = (xmm_t){i0, i1, i2, i3};
++
++	return data;
++}
++
+ #endif
+ 
+ #endif /* _TEST_XMMT_OPS_H_ */
+diff --git a/config/meson.build b/config/meson.build
+index 7134e80e8d..7f7b6c92fd 100644
+--- a/config/meson.build
++++ b/config/meson.build
+@@ -121,6 +121,8 @@ if cpu_instruction_set == 'generic'
+         cpu_instruction_set = 'generic'
+     elif host_machine.cpu_family().startswith('ppc')
+         cpu_instruction_set = 'power8'
++    elif host_machine.cpu_family().startswith('riscv')
++        cpu_instruction_set = 'riscv'
+     endif
+ endif
+ 
+diff --git a/config/riscv/meson.build b/config/riscv/meson.build
+new file mode 100644
+index 0000000000..0c16c31fc2
+--- /dev/null
++++ b/config/riscv/meson.build
+@@ -0,0 +1,143 @@
++# SPDX-License-Identifier: BSD-3-Clause
++# Copyright(c) 2017 Intel Corporation.
++# Copyright(c) 2017 Cavium, Inc
++# Copyright(c) 2021 PANTHEON.tech s.r.o.
++# Copyright(c) 2022 StarFive
++# Copyright(c) 2022 SiFive
++# Copyright(c) 2022 Semihalf
++
++if not is_linux
++    error('Only Linux is supported at this point in time.')
++endif
++
++if not dpdk_conf.get('RTE_ARCH_64')
++    error('Only 64-bit compiles are supported for this platform type')
++endif
++
++dpdk_conf.set('RTE_ARCH', 'riscv')
++dpdk_conf.set('RTE_ARCH_RISCV', 1)
++dpdk_conf.set('RTE_FORCE_INTRINSICS', 1)
++
++# common flags to all riscv builds, with lowest priority
++flags_common = [
++    ['RTE_ARCH_RISCV', true],
++    ['RTE_CACHE_LINE_SIZE', 64],
++    # Set this to true if target emulates U-mode TIME CSR via M or S mode trap.
++    # This allows to remove a FENCE on rte_rdtsc_precise() as trap effectively
++    # acts as one.
++    ['RTE_RISCV_EMU_UTIME', false],
++    # Set this to true if target emulates U-mode CYCLE CSR via M or S mode trap.
++    # This allows to remove a FENCE on rte_rdtsc_precise() as trap effectively
++    # acts as one.
++    ['RTE_RISCV_EMU_UCYCLE', false],
++    # Manually set wall time clock frequency for the target. If 0, then it is
++    # read from /proc/device-tree/cpus/timebase-frequency. This property is
++    # guaranteed on Linux, as riscv time_init() requires it.
++    ['RTE_RISCV_TIME_FREQ', 0],
++]
++
++## SoC-specific options.
++# The priority is like this: arch > vendor > common.
++#
++# Note that currently there's no way of getting vendor/microarchitecture id
++# values in userspace which is why the logic of choosing the right flag
++# combination is strictly based on the values passed from a cross-file.
++vendor_generic = {
++    'description': 'Generic RISC-V',
++    'flags': [
++        ['RTE_MACHINE', '"riscv"'],
++        ['RTE_USE_C11_MEM_MODEL', true],
++        ['RTE_MAX_LCORE', 128],
++        ['RTE_MAX_NUMA_NODES', 2]
++    ],
++    'arch_config': {
++        'generic': {'machine_args': ['-march=rv64gc']}
++    }
++}
++
++arch_config_riscv = {
++    '0x8000000000000007': {
++        'machine_args':  ['-march=rv64gc', '-mtune=sifive-7-series'],
++        'flags': [
++            ['RTE_RISCV_EMU_UTIME', true],
++            ['RTE_RISCV_EMU_UCYCLE', true]
++        ]
++    },
++}
++
++vendor_sifive = {
++    'description': 'SiFive',
++    'flags': [
++        ['RTE_MACHINE', '"riscv"'],
++        ['RTE_USE_C11_MEM_MODEL', true],
++        ['RTE_MAX_LCORE', 4],
++        ['RTE_MAX_NUMA_NODES', 1],
++    ],
++    'arch_config': arch_config_riscv
++}
++
++vendors = {
++    'generic': vendor_generic,
++    '0x489': vendor_sifive
++}
++
++# Native/cross vendor/arch detection
++if not meson.is_cross_build()
++    if machine == 'default'
++        # default build
++        vendor_id = 'generic'
++        arch_id = 'generic'
++        message('generic RISC-V')
++    else
++        vendor_id = 'generic'
++        arch_id = 'generic'
++        warning('RISC-V arch discovery not available, using generic!')
++    endif
++else
++    # cross build
++    vendor_id = meson.get_cross_property('vendor_id')
++    arch_id = meson.get_cross_property('arch_id')
++endif
++
++if vendors.has_key(vendor_id)
++    vendor_config = vendors[vendor_id]
++else
++    error('Unsupported RISC-V vendor: @0@. '.format(vendor_id) +
++        'Please add support for it or use the generic ' +
++        '(-Dmachine=generic) build.')
++endif
++
++message('RISC-V vendor: ' + vendor_config['description'])
++message('RISC-V architecture id: ' + arch_id)
++
++arch_config = vendor_config['arch_config']
++if arch_config.has_key(arch_id)
++    # use the specified arch_id machine args if found
++    arch_config = arch_config[arch_id]
++else
++    # unknown micro-architecture id
++    error('Unsupported architecture @0@ of vendor @1@. '
++        .format(arch_id, vendor_id) +
++        'Please add support for it or use the generic ' +
++        '(-Dmachine=generic) build.')
++endif
++
++# Concatenate flags respecting priorities.
++dpdk_flags = flags_common + vendor_config['flags'] + arch_config.get('flags', [])
++
++# apply supported machine args
++machine_args = [] # Clear previous machine args
++foreach flag: arch_config['machine_args']
++    if cc.has_argument(flag)
++        machine_args += flag
++    endif
++endforeach
++
++# apply flags
++foreach flag: dpdk_flags
++    if flag.length() > 0
++        dpdk_conf.set(flag[0], flag[1])
++    endif
++endforeach
++message('Using machine args: @0@'.format(machine_args))
++
+diff --git a/config/riscv/riscv64_linux_gcc b/config/riscv/riscv64_linux_gcc
+new file mode 100644
+index 0000000000..04248d7ecb
+--- /dev/null
++++ b/config/riscv/riscv64_linux_gcc
+@@ -0,0 +1,17 @@
++[binaries]
++c = 'riscv64-linux-gnu-gcc'
++cpp = 'riscv64-linux-gnu-g++'
++ar = 'riscv64-linux-gnu-ar'
++strip = 'riscv64-linux-gnu-strip'
++pcap-config = ''
++pkgconfig = 'riscv64-linux-gnu-pkg-config'
++
++[host_machine]
++system = 'linux'
++cpu_family = 'riscv64'
++cpu = 'rv64gc'
++endian = 'little'
++
++[properties]
++vendor_id = 'generic'
++arch_id = 'generic'
+diff --git a/config/riscv/riscv64_sifive_u740_linux_gcc b/config/riscv/riscv64_sifive_u740_linux_gcc
+new file mode 100644
+index 0000000000..7b5ad2562d
+--- /dev/null
++++ b/config/riscv/riscv64_sifive_u740_linux_gcc
+@@ -0,0 +1,19 @@
++[binaries]
++c = 'riscv64-unknown-linux-gnu-gcc'
++cpp = 'riscv64-unknown-linux-gnu-g++'
++ar = 'riscv64-unknown-linux-gnu-ar'
++strip = 'riscv64-unknown-linux-gnu-strip'
++pcap-config = ''
++pkgconfig = 'riscv64-unknown-linux-gnu-pkg-config'
++
++[host_machine]
++system = 'linux'
++cpu_family = 'riscv64'
++cpu = 'rv64gc'
++endian = 'little'
++
++[properties]
++vendor_id = '0x489'
++arch_id = '0x8000000000000007'
++max_lcores = 4
++max_numa_nodes = 1
+diff --git a/doc/guides/contributing/design.rst b/doc/guides/contributing/design.rst
+index d5ca8b4d9c..0383afe5c8 100644
+--- a/doc/guides/contributing/design.rst
++++ b/doc/guides/contributing/design.rst
+@@ -42,7 +42,7 @@ Per Architecture Sources
+ The following macro options can be used:
+ 
+ * ``RTE_ARCH`` is a string that contains the name of the architecture.
+-* ``RTE_ARCH_I686``, ``RTE_ARCH_X86_64``, ``RTE_ARCH_X86_X32``, ``RTE_ARCH_PPC_64``, ``RTE_ARCH_ARM``, ``RTE_ARCH_ARMv7`` or ``RTE_ARCH_ARM64`` are defined only if we are building for those architectures.
++* ``RTE_ARCH_I686``, ``RTE_ARCH_X86_64``, ``RTE_ARCH_X86_X32``, ``RTE_ARCH_PPC_64``, ``RTE_ARCH_RISCV``, ``RTE_ARCH_ARM``, ``RTE_ARCH_ARMv7`` or ``RTE_ARCH_ARM64`` are defined only if we are building for those architectures.
+ 
+ Per Execution Environment Sources
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+diff --git a/doc/guides/linux_gsg/cross_build_dpdk_for_riscv.rst b/doc/guides/linux_gsg/cross_build_dpdk_for_riscv.rst
+new file mode 100644
+index 0000000000..9907b35a1d
+--- /dev/null
++++ b/doc/guides/linux_gsg/cross_build_dpdk_for_riscv.rst
+@@ -0,0 +1,125 @@
++..  SPDX-License-Identifier: BSD-3-Clause
++    Copyright(c) 2020 ARM Corporation.
++    Copyright(c) 2022 StarFive
++    Copyright(c) 2022 SiFive
++    Copyright(c) 2022 Semihalf
++
++Cross compiling DPDK for RISC-V
++===============================
++
++This chapter describes how to cross compile DPDK for RISC-V from x86 build
++hosts.
++
++.. note::
++
++   While it's possible to compile DPDK natively on a RISC-V host, it is
++   currently recommended to cross-compile as Linux kernel does not offer any
++   way for userspace to discover the vendor and architecture identifiers of the
++   CPU and therefore any per-chip optimization options have to be chosen via
++   a cross-file or ``c_args``.
++
++
++Prerequisites
++-------------
++
++
++Linux kernel
++~~~~~~~~~~~~
++
++It is recommended to use Linux kernel built from
++`SiFive Freedom Unleashed SDK <https://github.com/sifive/freedom-u-sdk>`_.
++
++
++Meson prerequisites
++~~~~~~~~~~~~~~~~~~~
++
++Meson depends on pkgconfig to find the dependencies.
++The package ``pkg-config-riscv64-linux-gnu`` is required for RISC-V.
++To install it in Ubuntu::
++
++   sudo apt install pkg-config-riscv64-linux-gnu
++
++
++GNU toolchain
++-------------
++
++
++Obtain the cross toolchain
++~~~~~~~~~~~~~~~~~~~~~~~~~~
++
++The build process was tested using:
++
++* Ubuntu toolchain (the ``crossbuild-essential-riscv64`` package).
++
++* Latest `RISC-V GNU toolchain
++  <https://github.com/riscv/riscv-gnu-toolchain/releases>`_ on Ubuntu or Arch
++  Linux.
++
++Alternatively the toolchain may be built straight from the source, to do that
++follow the instructions on the riscv-gnu-toolchain github page.
++
++
++Unzip and add into the PATH
++~~~~~~~~~~~~~~~~~~~~~~~~~~~
++
++This step is only required for the riscv-gnu-toolchain. The Ubuntu toolchain is
++in the PATH already.
++
++.. code-block:: console
++
++   tar -xvf riscv64-glibc-ubuntu-20.04-<version>.tar.gz
++   export PATH=$PATH:<cross_install_dir>/riscv/bin
++
++
++Cross Compiling DPDK with GNU toolchain using Meson
++~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++
++To cross-compile DPDK for a desired target machine use the following command::
++
++   meson cross-build --cross-file <target_machine_configuration>
++   ninja -C cross-build
++
++For example if the target machine is a generic rv64gc RISC-V, use the following
++command::
++
++   meson riscv64-build-gcc --cross-file config/riscv/riscv64_linux_gcc
++   ninja -C riscv64-build-gcc
++
++If riscv-gnu-toolchain is used, binary names should be updated to match. Update the following lines in the cross-file:
++
++.. code-block:: console
++
++   [binaries]
++   c = 'riscv64-unknown-linux-gnu-gcc'
++   cpp = 'riscv64-unknown-linux-gnu-g++'
++   ar = 'riscv64-unknown-linux-gnu-ar'
++   strip = 'riscv64-unknown-linux-gnu-strip'
++   ...
++
++Some toolchains (such as freedom-u-sdk one) require also setting ``--sysroot``,
++otherwise include paths might not be resolved. To do so, add the appropriate
++paths to the cross-file:
++
++.. code-block:: console
++
++   [properties]
++   ...
++   c_args = ['--sysroot', '<path/to/toolchain/sysroot>']
++   cpp_args = c_args
++   c_link_args = ['--sysroot', '<path/to/toolchain/sysroot>']
++   cpp_link_args = c_link_args
++   ...
++
++
++Supported cross-compilation targets
++-----------------------------------
++
++Currently the following targets are supported:
++
++* Generic rv64gc ISA: ``config/riscv/riscv64_linux_gcc``
++
++* SiFive U740 SoC: ``config/riscv/riscv64_sifive_u740_linux_gcc``
++
++To add a new target support, ``config/riscv/meson.build`` has to be modified by
++adding a new vendor/architecture id and a corresponding cross-file has to be
++added to ``config/riscv`` directory.
+diff --git a/doc/guides/linux_gsg/index.rst b/doc/guides/linux_gsg/index.rst
+index 16a9a67260..747552c385 100644
+--- a/doc/guides/linux_gsg/index.rst
++++ b/doc/guides/linux_gsg/index.rst
+@@ -14,6 +14,7 @@ Getting Started Guide for Linux
+     sys_reqs
+     build_dpdk
+     cross_build_dpdk_for_arm64
++    cross_build_dpdk_for_riscv
+     linux_drivers
+     build_sample_apps
+     linux_eal_parameters
+diff --git a/doc/guides/nics/features.rst b/doc/guides/nics/features.rst
+index 21bedb743f..6c4fa74bc7 100644
+--- a/doc/guides/nics/features.rst
++++ b/doc/guides/nics/features.rst
+@@ -855,6 +855,11 @@ x86-64
+ 
+ Support 64bits x86 architecture.
+ 
++rv64
++----
++
++Support 64-bit RISC-V architecture.
++
+ 
+ .. _nic_features_usage_doc:
+ 
+diff --git a/doc/guides/nics/features/default.ini b/doc/guides/nics/features/default.ini
+index b1d18ac62c..02198682c6 100644
+--- a/doc/guides/nics/features/default.ini
++++ b/doc/guides/nics/features/default.ini
+@@ -74,6 +74,7 @@ ARMv8                =
+ Power8               =
+ x86-32               =
+ x86-64               =
++rv64                 =
+ Usage doc            =
+ Design doc           =
+ Perf doc             =
+diff --git a/doc/guides/rel_notes/release_22_07.rst b/doc/guides/rel_notes/release_22_07.rst
+index 29689c25cd..d851886176 100644
+--- a/doc/guides/rel_notes/release_22_07.rst
++++ b/doc/guides/rel_notes/release_22_07.rst
+@@ -55,6 +55,29 @@ New Features
+      Also, make sure to start the actual text at the margin.
+      =======================================================
+ 
++* **Added initial RISC-V architecture support.***
++
++  Added EAL implementation for RISC-V architecture. The initial device the
++  porting was tested on is a HiFive Unmatched development board based on the
++  SiFive Freedom U740 SoC. In theory this implementation should work with any
++  ``rv64gc`` ISA compatible implementation with MMU supporting a reasonable
++  address space size (U740 uses sv39 MMU).
++
++  * Verified with meson tests. ``fast-tests`` suite passing with default config.
++  * Verified PMD operation with Intel x520-DA2 NIC (``ixgbe``) and ``test-pmd``
++    application. Packet transfer checked using all UIO drivers available for
++    non-IOMMU platforms: ``uio_pci_generic``, ``vfio-pci noiommu`` and
++    ``igb_uio``.
++  * The ``i40e`` PMD driver is disabled on RISC-V as ``rv64gc`` ISA has no
++    vector operations.
++  * RISCV support is currently limited to Linux.
++  * Clang compilation currently not supported due to issues with relocation
++    relaxation.
++  * Debug build of ``app/test/dpdk-test`` fails currently on RISC-V due to
++    seemingly invalid loop and goto jump code generation by GCC in
++    ``test_ring.c`` where extensive inlining increases the code size beyond the
++    capability of the generated instruction (JAL: +/-1MB PC-relative).
++
+ * **Updated Intel iavf driver.**
+ 
+   * Added Tx QoS queue rate limitation support.
+diff --git a/drivers/net/i40e/meson.build b/drivers/net/i40e/meson.build
+index efc5f93e35..a4c1c9079a 100644
+--- a/drivers/net/i40e/meson.build
++++ b/drivers/net/i40e/meson.build
+@@ -1,6 +1,12 @@
+ # SPDX-License-Identifier: BSD-3-Clause
+ # Copyright(c) 2017 Intel Corporation
+ 
++if arch_subdir == 'riscv'
++		build = false
++		reason = 'riscv arch not supported'
++		subdir_done()
++endif
++
+ cflags += ['-DPF_DRIVER',
+     '-DVF_DRIVER',
+     '-DINTEGRATED_VF',
+diff --git a/drivers/net/ixgbe/meson.build b/drivers/net/ixgbe/meson.build
+index 162f8d5f46..88539e97d5 100644
+--- a/drivers/net/ixgbe/meson.build
++++ b/drivers/net/ixgbe/meson.build
+@@ -1,6 +1,12 @@
+ # SPDX-License-Identifier: BSD-3-Clause
+ # Copyright(c) 2017 Intel Corporation
+ 
++if arch_subdir == 'riscv'
++		build = false
++		reason = 'riscv arch not supported'
++		subdir_done()
++endif
++
+ cflags += ['-DRTE_LIBRTE_IXGBE_BYPASS']
+ 
+ subdir('base')
+diff --git a/drivers/net/memif/meson.build b/drivers/net/memif/meson.build
+index 680bc8631c..9afb495953 100644
+--- a/drivers/net/memif/meson.build
++++ b/drivers/net/memif/meson.build
+@@ -5,6 +5,11 @@ if not is_linux
+     build = false
+     reason = 'only supported on Linux'
+ endif
++if arch_subdir == 'riscv'
++		build = false
++		reason = 'riscv arch not supported'
++		subdir_done()
++endif
+ 
+ sources = files(
+         'memif_socket.c',
+diff --git a/drivers/net/tap/meson.build b/drivers/net/tap/meson.build
+index c09713a67b..3efac9ac07 100644
+--- a/drivers/net/tap/meson.build
++++ b/drivers/net/tap/meson.build
+@@ -5,6 +5,11 @@ if not is_linux
+     build = false
+     reason = 'only supported on Linux'
+ endif
++if arch_subdir == 'riscv'
++		build = false
++		reason = 'riscv arch not supported'
++		subdir_done()
++endif
+ sources = files(
+         'rte_eth_tap.c',
+         'tap_bpf_api.c',
+diff --git a/examples/l3fwd/meson.build b/examples/l3fwd/meson.build
+index 0830b3eb31..75fa19b7fe 100644
+--- a/examples/l3fwd/meson.build
++++ b/examples/l3fwd/meson.build
+@@ -6,6 +6,12 @@
+ # To build this example as a standalone application with an already-installed
+ # DPDK instance, use 'make'
+ 
++if dpdk_conf.has('RTE_ARCH_RISCV')
++		build = false
++		reason = 'riscv arch not supported'
++		subdir_done()
++endif
++
+ allow_experimental_apis = true
+ deps += ['hash', 'lpm', 'fib', 'eventdev']
+ sources = files(
+diff --git a/lib/eal/riscv/include/meson.build b/lib/eal/riscv/include/meson.build
+new file mode 100644
+index 0000000000..d290ed82ed
+--- /dev/null
++++ b/lib/eal/riscv/include/meson.build
+@@ -0,0 +1,23 @@
++# SPDX-License-Identifier: BSD-3-Clause
++# Copyright(c) 2022 StarFive
++# Copyright(c) 2022 SiFive
++# Copyright(c) 2022 Semihalf
++
++arch_headers = files(
++	'rte_atomic.h',
++	'rte_byteorder.h',
++	'rte_cpuflags.h',
++	'rte_cycles.h',
++	'rte_io.h',
++	'rte_mcslock.h',
++	'rte_memcpy.h',
++	'rte_pause.h',
++	'rte_pflock.h',
++	'rte_power_intrinsics.h',
++	'rte_prefetch.h',
++	'rte_rwlock.h',
++	'rte_spinlock.h',
++	'rte_ticketlock.h',
++	'rte_vect.h'
++)
++install_headers(arch_headers, subdir: get_option('include_subdir_arch'))
+diff --git a/lib/eal/riscv/include/rte_atomic.h b/lib/eal/riscv/include/rte_atomic.h
+new file mode 100644
+index 0000000000..4b4633c914
+--- /dev/null
++++ b/lib/eal/riscv/include/rte_atomic.h
+@@ -0,0 +1,52 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2022 StarFive
++ * Copyright(c) 2022 SiFive
++ * Copyright(c) 2022 Semihalf
++ * All rights reserved.
++ */
++
++#ifndef RTE_ATOMIC_RISCV_H
++#define RTE_ATOMIC_RISCV_H
++
++#ifndef RTE_FORCE_INTRINSICS
++#  error Platform must be built with RTE_FORCE_INTRINSICS
++#endif
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#include <stdint.h>
++#include <rte_common.h>
++#include <rte_config.h>
++#include "generic/rte_atomic.h"
++
++#define rte_mb()	asm volatile("fence rw, rw" : : : "memory")
++
++#define rte_wmb()	asm volatile("fence w, w" : : : "memory")
++
++#define rte_rmb()	asm volatile("fence r, r" : : : "memory")
++
++#define rte_smp_mb()	rte_mb()
++
++#define rte_smp_wmb()	rte_wmb()
++
++#define rte_smp_rmb()	rte_rmb()
++
++#define rte_io_mb()	asm volatile("fence iorw, iorw" : : : "memory")
++
++#define rte_io_wmb()	asm volatile("fence orw, ow" : : : "memory")
++
++#define rte_io_rmb()	asm volatile("fence ir, ir" : : : "memory")
++
++static __rte_always_inline void
++rte_atomic_thread_fence(int memorder)
++{
++	__atomic_thread_fence(memorder);
++}
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* RTE_ATOMIC_RISCV_H */
+diff --git a/lib/eal/riscv/include/rte_byteorder.h b/lib/eal/riscv/include/rte_byteorder.h
+new file mode 100644
+index 0000000000..21893505d6
+--- /dev/null
++++ b/lib/eal/riscv/include/rte_byteorder.h
+@@ -0,0 +1,44 @@
++/*
++ * SPDX-License-Identifier: BSD-3-Clause
++ * Inspired from FreeBSD src/sys/powerpc/include/endian.h
++ * Copyright(c) 1987, 1991, 1993
++ * The Regents of the University of California.  All rights reserved.
++ */
++
++#ifndef RTE_BYTEORDER_RISCV_H
++#define RTE_BYTEORDER_RISCV_H
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#include <stdint.h>
++#include <rte_common.h>
++#include "generic/rte_byteorder.h"
++
++#ifndef RTE_BYTE_ORDER
++#define RTE_BYTE_ORDER RTE_LITTLE_ENDIAN
++#endif
++
++#define rte_cpu_to_le_16(x) (x)
++#define rte_cpu_to_le_32(x) (x)
++#define rte_cpu_to_le_64(x) (x)
++
++#define rte_cpu_to_be_16(x) rte_bswap16(x)
++#define rte_cpu_to_be_32(x) rte_bswap32(x)
++#define rte_cpu_to_be_64(x) rte_bswap64(x)
++
++#define rte_le_to_cpu_16(x) (x)
++#define rte_le_to_cpu_32(x) (x)
++#define rte_le_to_cpu_64(x) (x)
++
++#define rte_be_to_cpu_16(x) rte_bswap16(x)
++#define rte_be_to_cpu_32(x) rte_bswap32(x)
++#define rte_be_to_cpu_64(x) rte_bswap64(x)
++
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* RTE_BYTEORDER_RISCV_H */
+diff --git a/lib/eal/riscv/include/rte_cpuflags.h b/lib/eal/riscv/include/rte_cpuflags.h
+new file mode 100644
+index 0000000000..66e787f898
+--- /dev/null
++++ b/lib/eal/riscv/include/rte_cpuflags.h
+@@ -0,0 +1,55 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2014 IBM Corporation
++ * Copyright(c) 2022 StarFive
++ * Copyright(c) 2022 SiFive
++ * Copyright(c) 2022 Semihalf
++ */
++
++#ifndef RTE_CPUFLAGS_RISCV_H
++#define RTE_CPUFLAGS_RISCV_H
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++/**
++ * Enumeration of all CPU features supported
++ */
++enum rte_cpu_flag_t {
++	RTE_CPUFLAG_RISCV_ISA_A, /* Atomic */
++	RTE_CPUFLAG_RISCV_ISA_B, /* Bit-Manipulation */
++	RTE_CPUFLAG_RISCV_ISA_C, /* Compressed instruction */
++	RTE_CPUFLAG_RISCV_ISA_D, /* Double precision floating-point  */
++	RTE_CPUFLAG_RISCV_ISA_E, /* RV32E ISA */
++	RTE_CPUFLAG_RISCV_ISA_F, /* Single precision floating-point */
++	RTE_CPUFLAG_RISCV_ISA_G, /* Extension pack (IMAFD, Zicsr, Zifencei) */
++	RTE_CPUFLAG_RISCV_ISA_H, /* Hypervisor */
++	RTE_CPUFLAG_RISCV_ISA_I, /* RV32I/RV64I/IRV128I base ISA */
++	RTE_CPUFLAG_RISCV_ISA_J, /* Dynamic Translation Language */
++	RTE_CPUFLAG_RISCV_ISA_K, /* Reserved */
++	RTE_CPUFLAG_RISCV_ISA_L, /* Decimal Floating-Point */
++	RTE_CPUFLAG_RISCV_ISA_M, /* Integer Multiply/Divide */
++	RTE_CPUFLAG_RISCV_ISA_N, /* User-level interrupts */
++	RTE_CPUFLAG_RISCV_ISA_O, /* Reserved */
++	RTE_CPUFLAG_RISCV_ISA_P, /* Packed-SIMD */
++	RTE_CPUFLAG_RISCV_ISA_Q, /* Quad-precision floating-points */
++	RTE_CPUFLAG_RISCV_ISA_R, /* Reserved */
++	RTE_CPUFLAG_RISCV_ISA_S, /* Supervisor mode */
++	RTE_CPUFLAG_RISCV_ISA_T, /* Transactional memory */
++	RTE_CPUFLAG_RISCV_ISA_U, /* User mode */
++	RTE_CPUFLAG_RISCV_ISA_V, /* Vector */
++	RTE_CPUFLAG_RISCV_ISA_W, /* Reserved */
++	RTE_CPUFLAG_RISCV_ISA_X, /* Non-standard extension present */
++	RTE_CPUFLAG_RISCV_ISA_Y, /* Reserved */
++	RTE_CPUFLAG_RISCV_ISA_Z, /* Reserved */
++	/* The last item */
++	RTE_CPUFLAG_NUMFLAGS,/**< This should always be the last! */
++};
++
++#include "generic/rte_cpuflags.h"
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* RTE_CPUFLAGS_RISCV_H */
+diff --git a/lib/eal/riscv/include/rte_cycles.h b/lib/eal/riscv/include/rte_cycles.h
+new file mode 100644
+index 0000000000..1eb6e2bad2
+--- /dev/null
++++ b/lib/eal/riscv/include/rte_cycles.h
+@@ -0,0 +1,103 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2015 Cavium, Inc
++ * Copyright(c) 2022 StarFive
++ * Copyright(c) 2022 SiFive
++ * Copyright(c) 2022 Semihalf
++ */
++
++#ifndef RTE_CYCLES_RISCV_H
++#define RTE_CYCLES_RISCV_H
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#include "generic/rte_cycles.h"
++
++#ifndef RTE_RISCV_RDTSC_USE_HPM
++#define RTE_RISCV_RDTSC_USE_HPM 0
++#endif
++
++#define RV64_CSRR(reg, value) \
++	asm volatile("csrr %0, " #reg : "=r" (value) : : "memory")
++
++/** Read wall time counter */
++static __rte_always_inline uint64_t
++__rte_riscv_rdtime(void)
++{
++	uint64_t tsc;
++	RV64_CSRR(time, tsc);
++	return tsc;
++}
++
++/** Read wall time counter ensuring no re-ordering */
++static __rte_always_inline uint64_t
++__rte_riscv_rdtime_precise(void)
++{
++#if !defined(RTE_RISCV_EMU_UTIME)
++	asm volatile("fence" : : : "memory");
++#endif
++	return __rte_riscv_rdtime();
++}
++
++/** Read hart cycle counter */
++static __rte_always_inline uint64_t
++__rte_riscv_rdcycle(void)
++{
++	uint64_t tsc;
++	RV64_CSRR(cycle, tsc);
++	return tsc;
++}
++
++/** Read hart cycle counter ensuring no re-ordering */
++static __rte_always_inline uint64_t
++__rte_riscv_rdcycle_precise(void)
++{
++#if !defined(RTE_RISCV_EMU_UCYCLE)
++	asm volatile("fence" : : : "memory");
++#endif
++	return __rte_riscv_rdcycle();
++}
++
++/**
++ * Read the time base register.
++ *
++ * @return
++ *   The time base for this lcore.
++ */
++static __rte_always_inline uint64_t
++rte_rdtsc(void)
++{
++	/**
++	 * By default TIME userspace counter is used. Although it's frequency
++	 * may not be enough for all applications.
++	 */
++	if (!RTE_RISCV_RDTSC_USE_HPM)
++		return __rte_riscv_rdtime();
++	/**
++	 * Alternatively HPM's CYCLE counter may be used. However this counter
++	 * is not guaranteed by ISA to either be stable frequency or always
++	 * enabled for userspace access (it may trap to kernel or firmware).
++	 */
++	return __rte_riscv_rdcycle();
++}
++
++static inline uint64_t
++rte_rdtsc_precise(void)
++{
++	if (!RTE_RISCV_RDTSC_USE_HPM)
++		return __rte_riscv_rdtime_precise();
++	return __rte_riscv_rdcycle_precise();
++}
++
++static __rte_always_inline uint64_t
++rte_get_tsc_cycles(void)
++{
++	return rte_rdtsc();
++}
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* RTE_CYCLES_RISCV_H */
+diff --git a/lib/eal/riscv/include/rte_io.h b/lib/eal/riscv/include/rte_io.h
+new file mode 100644
+index 0000000000..29659c9590
+--- /dev/null
++++ b/lib/eal/riscv/include/rte_io.h
+@@ -0,0 +1,21 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2016 Cavium, Inc
++ * Copyright(c) 2022 StarFive
++ * Copyright(c) 2022 SiFive
++ * Copyright(c) 2022 Semihalf
++ */
++
++#ifndef RTE_IO_RISCV_H
++#define RTE_IO_RISCV_H
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#include "generic/rte_io.h"
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* RTE_IO_RISCV_H */
+diff --git a/lib/eal/riscv/include/rte_mcslock.h b/lib/eal/riscv/include/rte_mcslock.h
+new file mode 100644
+index 0000000000..b517cd5fc5
+--- /dev/null
++++ b/lib/eal/riscv/include/rte_mcslock.h
+@@ -0,0 +1,18 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2019 Arm Limited
++ */
++
++#ifndef RTE_MCSLOCK_RISCV_H
++#define RTE_MCSLOCK_RISCV_H
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#include "generic/rte_mcslock.h"
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* RTE_MCSLOCK_RISCV_H */
+diff --git a/lib/eal/riscv/include/rte_memcpy.h b/lib/eal/riscv/include/rte_memcpy.h
+new file mode 100644
+index 0000000000..e34f19396e
+--- /dev/null
++++ b/lib/eal/riscv/include/rte_memcpy.h
+@@ -0,0 +1,63 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2022 StarFive
++ * Copyright(c) 2022 SiFive
++ * Copyright(c) 2022 Semihalf
++ */
++
++#ifndef RTE_MEMCPY_RISCV_H
++#define RTE_MEMCPY_RISCV_H
++
++#include <stdint.h>
++#include <string.h>
++
++#include "rte_common.h"
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#include "generic/rte_memcpy.h"
++
++static inline void
++rte_mov16(uint8_t *dst, const uint8_t *src)
++{
++	memcpy(dst, src, 16);
++}
++
++static inline void
++rte_mov32(uint8_t *dst, const uint8_t *src)
++{
++	memcpy(dst, src, 32);
++}
++
++static inline void
++rte_mov48(uint8_t *dst, const uint8_t *src)
++{
++	memcpy(dst, src, 48);
++}
++
++static inline void
++rte_mov64(uint8_t *dst, const uint8_t *src)
++{
++	memcpy(dst, src, 64);
++}
++
++static inline void
++rte_mov128(uint8_t *dst, const uint8_t *src)
++{
++	memcpy(dst, src, 128);
++}
++
++static inline void
++rte_mov256(uint8_t *dst, const uint8_t *src)
++{
++	memcpy(dst, src, 256);
++}
++
++#define rte_memcpy(d, s, n)	memcpy((d), (s), (n))
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* RTE_MEMCPY_RISCV_H */
+diff --git a/lib/eal/riscv/include/rte_pause.h b/lib/eal/riscv/include/rte_pause.h
+new file mode 100644
+index 0000000000..c24c1f32e8
+--- /dev/null
++++ b/lib/eal/riscv/include/rte_pause.h
+@@ -0,0 +1,31 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2022 StarFive
++ * Copyright(c) 2022 SiFive
++ * Copyright(c) 2022 Semihalf
++ */
++
++#ifndef RTE_PAUSE_RISCV_H
++#define RTE_PAUSE_RISCV_H
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#include "rte_atomic.h"
++
++#include "generic/rte_pause.h"
++
++static inline void rte_pause(void)
++{
++	/* Insert pause hint directly to be compatible with old compilers.
++	 * This will work even on platforms without Zihintpause extension
++	 * because this is a FENCE hint instruction which evaluates to NOP then.
++	 */
++	asm volatile(".int 0x0100000F"::: "memory");
++}
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* RTE_PAUSE_RISCV_H */
+diff --git a/lib/eal/riscv/include/rte_pflock.h b/lib/eal/riscv/include/rte_pflock.h
+new file mode 100644
+index 0000000000..ce6ca02aca
+--- /dev/null
++++ b/lib/eal/riscv/include/rte_pflock.h
+@@ -0,0 +1,17 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2021 Microsoft Corporation
++ */
++#ifndef RTE_PFLOCK_RISCV_H
++#define RTE_PFLOCK_RISCV_H
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#include "generic/rte_pflock.h"
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* RTE_PFLOCK_RISCV_H */
+diff --git a/lib/eal/riscv/include/rte_power_intrinsics.h b/lib/eal/riscv/include/rte_power_intrinsics.h
+new file mode 100644
+index 0000000000..636e58e71f
+--- /dev/null
++++ b/lib/eal/riscv/include/rte_power_intrinsics.h
+@@ -0,0 +1,22 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2022 StarFive
++ * Copyright(c) 2022 SiFive
++ * Copyright(c) 2022 Semihalf
++ */
++
++#ifndef RTE_POWER_INTRINSIC_RISCV_H
++#define RTE_POWER_INTRINSIC_RISCV_H
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#include <rte_common.h>
++
++#include "generic/rte_power_intrinsics.h"
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* RTE_POWER_INTRINSIC_RISCV_H */
+diff --git a/lib/eal/riscv/include/rte_prefetch.h b/lib/eal/riscv/include/rte_prefetch.h
+new file mode 100644
+index 0000000000..966d9e2687
+--- /dev/null
++++ b/lib/eal/riscv/include/rte_prefetch.h
+@@ -0,0 +1,50 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2014 IBM Corporation
++ * Copyright(c) 2022 StarFive
++ * Copyright(c) 2022 SiFive
++ * Copyright(c) 2022 Semihalf
++ */
++
++#ifndef RTE_PREFETCH_RISCV_H
++#define RTE_PREFETCH_RISCV_H
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#include <rte_common.h>
++#include "generic/rte_prefetch.h"
++
++static inline void rte_prefetch0(const volatile void *p)
++{
++	RTE_SET_USED(p);
++}
++
++static inline void rte_prefetch1(const volatile void *p)
++{
++	RTE_SET_USED(p);
++}
++
++static inline void rte_prefetch2(const volatile void *p)
++{
++	RTE_SET_USED(p);
++}
++
++static inline void rte_prefetch_non_temporal(const volatile void *p)
++{
++	/* non-temporal version not available, fallback to rte_prefetch0 */
++	rte_prefetch0(p);
++}
++
++__rte_experimental
++static inline void
++rte_cldemote(const volatile void *p)
++{
++	RTE_SET_USED(p);
++}
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* RTE_PREFETCH_RISCV_H */
+diff --git a/lib/eal/riscv/include/rte_rwlock.h b/lib/eal/riscv/include/rte_rwlock.h
+new file mode 100644
+index 0000000000..9cdaf1b0ef
+--- /dev/null
++++ b/lib/eal/riscv/include/rte_rwlock.h
+@@ -0,0 +1,44 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2022 StarFive
++ * Copyright(c) 2022 SiFive
++ * Copyright(c) 2022 Semihalf
++ */
++
++#ifndef RTE_RWLOCK_RISCV_H
++#define RTE_RWLOCK_RISCV_H
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#include "generic/rte_rwlock.h"
++
++static inline void
++rte_rwlock_read_lock_tm(rte_rwlock_t *rwl)
++{
++	rte_rwlock_read_lock(rwl);
++}
++
++static inline void
++rte_rwlock_read_unlock_tm(rte_rwlock_t *rwl)
++{
++	rte_rwlock_read_unlock(rwl);
++}
++
++static inline void
++rte_rwlock_write_lock_tm(rte_rwlock_t *rwl)
++{
++	rte_rwlock_write_lock(rwl);
++}
++
++static inline void
++rte_rwlock_write_unlock_tm(rte_rwlock_t *rwl)
++{
++	rte_rwlock_write_unlock(rwl);
++}
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* RTE_RWLOCK_RISCV_H */
+diff --git a/lib/eal/riscv/include/rte_spinlock.h b/lib/eal/riscv/include/rte_spinlock.h
+new file mode 100644
+index 0000000000..6af430735c
+--- /dev/null
++++ b/lib/eal/riscv/include/rte_spinlock.h
+@@ -0,0 +1,67 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2015 RehiveTech. All rights reserved.
++ * Copyright(c) 2022 StarFive
++ * Copyright(c) 2022 SiFive
++ * Copyright(c) 2022 Semihalf
++ */
++
++#ifndef RTE_SPINLOCK_RISCV_H
++#define RTE_SPINLOCK_RISCV_H
++
++#ifndef RTE_FORCE_INTRINSICS
++#  error Platform must be built with RTE_FORCE_INTRINSICS
++#endif
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#include <rte_common.h>
++#include "generic/rte_spinlock.h"
++
++static inline int rte_tm_supported(void)
++{
++	return 0;
++}
++
++static inline void
++rte_spinlock_lock_tm(rte_spinlock_t *sl)
++{
++	rte_spinlock_lock(sl); /* fall-back */
++}
++
++static inline int
++rte_spinlock_trylock_tm(rte_spinlock_t *sl)
++{
++	return rte_spinlock_trylock(sl);
++}
++
++static inline void
++rte_spinlock_unlock_tm(rte_spinlock_t *sl)
++{
++	rte_spinlock_unlock(sl);
++}
++
++static inline void
++rte_spinlock_recursive_lock_tm(rte_spinlock_recursive_t *slr)
++{
++	rte_spinlock_recursive_lock(slr); /* fall-back */
++}
++
++static inline void
++rte_spinlock_recursive_unlock_tm(rte_spinlock_recursive_t *slr)
++{
++	rte_spinlock_recursive_unlock(slr);
++}
++
++static inline int
++rte_spinlock_recursive_trylock_tm(rte_spinlock_recursive_t *slr)
++{
++	return rte_spinlock_recursive_trylock(slr);
++}
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* RTE_SPINLOCK_RISCV_H */
+diff --git a/lib/eal/riscv/include/rte_ticketlock.h b/lib/eal/riscv/include/rte_ticketlock.h
+new file mode 100644
+index 0000000000..b8d2a4f937
+--- /dev/null
++++ b/lib/eal/riscv/include/rte_ticketlock.h
+@@ -0,0 +1,21 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2019 Arm Limited
++ * Copyright(c) 2022 StarFive
++ * Copyright(c) 2022 SiFive
++ * Copyright(c) 2022 Semihalf
++ */
++
++#ifndef RTE_TICKETLOCK_RISCV_H
++#define RTE_TICKETLOCK_RISCV_H
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#include "generic/rte_ticketlock.h"
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* RTE_TICKETLOCK_RISCV_H */
+diff --git a/lib/eal/riscv/include/rte_vect.h b/lib/eal/riscv/include/rte_vect.h
+new file mode 100644
+index 0000000000..4600521c20
+--- /dev/null
++++ b/lib/eal/riscv/include/rte_vect.h
+@@ -0,0 +1,55 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2022 StarFive
++ * Copyright(c) 2022 SiFive
++ * Copyright(c) 2022 Semihalf
++ */
++
++#ifndef RTE_VECT_RISCV_H
++#define RTE_VECT_RISCV_H
++
++#include <stdint.h>
++#include "generic/rte_vect.h"
++#include "rte_common.h"
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#define RTE_VECT_DEFAULT_SIMD_BITWIDTH RTE_VECT_SIMD_DISABLED
++
++typedef int32_t		xmm_t __attribute__((vector_size(16)));
++
++#define XMM_SIZE	(sizeof(xmm_t))
++#define XMM_MASK	(XMM_SIZE - 1)
++
++typedef union rte_xmm {
++	xmm_t		x;
++	uint8_t		u8[XMM_SIZE / sizeof(uint8_t)];
++	uint16_t	u16[XMM_SIZE / sizeof(uint16_t)];
++	uint32_t	u32[XMM_SIZE / sizeof(uint32_t)];
++	uint64_t	u64[XMM_SIZE / sizeof(uint64_t)];
++	double		pd[XMM_SIZE / sizeof(double)];
++} __rte_aligned(8) rte_xmm_t;
++
++static inline xmm_t
++vect_load_128(void *p)
++{
++	xmm_t ret = *((xmm_t *)p);
++	return ret;
++}
++
++static inline xmm_t
++vect_and(xmm_t data, xmm_t mask)
++{
++	rte_xmm_t ret = (rte_xmm_t)data;
++	rte_xmm_t m = (rte_xmm_t)mask;
++	ret.u64[0] &= m.u64[0];
++	ret.u64[1] &= m.u64[1];
++	return ret.x;
++}
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* RTE_VECT_RISCV_H */
+diff --git a/lib/eal/riscv/meson.build b/lib/eal/riscv/meson.build
+new file mode 100644
+index 0000000000..6ec53ea03a
+--- /dev/null
++++ b/lib/eal/riscv/meson.build
+@@ -0,0 +1,11 @@
++# SPDX-License-Identifier: BSD-3-Clause
++# Copyright(c) 2017 Intel Corporation.
++
++subdir('include')
++
++sources += files(
++	'rte_cpuflags.c',
++	'rte_cycles.c',
++	'rte_hypervisor.c',
++	'rte_power_intrinsics.c',
++)
+diff --git a/lib/eal/riscv/rte_cpuflags.c b/lib/eal/riscv/rte_cpuflags.c
+new file mode 100644
+index 0000000000..4f6d29b947
+--- /dev/null
++++ b/lib/eal/riscv/rte_cpuflags.c
+@@ -0,0 +1,122 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2022 StarFive
++ * Copyright(c) 2022 SiFive
++ * Copyright(c) 2022 Semihalf
++ */
++
++#include "rte_cpuflags.h"
++
++#include <elf.h>
++#include <fcntl.h>
++#include <assert.h>
++#include <unistd.h>
++#include <string.h>
++
++#ifndef AT_HWCAP
++#define AT_HWCAP 16
++#endif
++
++#ifndef AT_HWCAP2
++#define AT_HWCAP2 26
++#endif
++
++#ifndef AT_PLATFORM
++#define AT_PLATFORM 15
++#endif
++
++enum cpu_register_t {
++	REG_NONE = 0,
++	REG_HWCAP,
++	REG_HWCAP2,
++	REG_PLATFORM,
++	REG_MAX
++};
++
++typedef uint32_t hwcap_registers_t[REG_MAX];
++
++/**
++ * Struct to hold a processor feature entry
++ */
++struct feature_entry {
++	uint32_t reg;
++	uint32_t bit;
++#define CPU_FLAG_NAME_MAX_LEN 64
++	char name[CPU_FLAG_NAME_MAX_LEN];
++};
++
++#define FEAT_DEF(name, reg, bit) \
++	[RTE_CPUFLAG_##name] = {reg, bit, #name},
++
++typedef Elf64_auxv_t _Elfx_auxv_t;
++
++const struct feature_entry rte_cpu_feature_table[] = {
++	FEAT_DEF(RISCV_ISA_A, REG_HWCAP,    0)
++	FEAT_DEF(RISCV_ISA_B, REG_HWCAP,    1)
++	FEAT_DEF(RISCV_ISA_C, REG_HWCAP,    2)
++	FEAT_DEF(RISCV_ISA_D, REG_HWCAP,    3)
++	FEAT_DEF(RISCV_ISA_E, REG_HWCAP,    4)
++	FEAT_DEF(RISCV_ISA_F, REG_HWCAP,    5)
++	FEAT_DEF(RISCV_ISA_G, REG_HWCAP,    6)
++	FEAT_DEF(RISCV_ISA_H, REG_HWCAP,    7)
++	FEAT_DEF(RISCV_ISA_I, REG_HWCAP,    8)
++	FEAT_DEF(RISCV_ISA_J, REG_HWCAP,    9)
++	FEAT_DEF(RISCV_ISA_K, REG_HWCAP,   10)
++	FEAT_DEF(RISCV_ISA_L, REG_HWCAP,   11)
++	FEAT_DEF(RISCV_ISA_M, REG_HWCAP,   12)
++	FEAT_DEF(RISCV_ISA_N, REG_HWCAP,   13)
++	FEAT_DEF(RISCV_ISA_O, REG_HWCAP,   14)
++	FEAT_DEF(RISCV_ISA_P, REG_HWCAP,   15)
++	FEAT_DEF(RISCV_ISA_Q, REG_HWCAP,   16)
++	FEAT_DEF(RISCV_ISA_R, REG_HWCAP,   17)
++	FEAT_DEF(RISCV_ISA_S, REG_HWCAP,   18)
++	FEAT_DEF(RISCV_ISA_T, REG_HWCAP,   19)
++	FEAT_DEF(RISCV_ISA_U, REG_HWCAP,   20)
++	FEAT_DEF(RISCV_ISA_V, REG_HWCAP,   21)
++	FEAT_DEF(RISCV_ISA_W, REG_HWCAP,   22)
++	FEAT_DEF(RISCV_ISA_X, REG_HWCAP,   23)
++	FEAT_DEF(RISCV_ISA_Y, REG_HWCAP,   24)
++	FEAT_DEF(RISCV_ISA_Z, REG_HWCAP,   25)
++};
++/*
++ * Read AUXV software register and get cpu features for ARM
++ */
++static void
++rte_cpu_get_features(hwcap_registers_t out)
++{
++	out[REG_HWCAP] = rte_cpu_getauxval(AT_HWCAP);
++	out[REG_HWCAP2] = rte_cpu_getauxval(AT_HWCAP2);
++}
++
++/*
++ * Checks if a particular flag is available on current machine.
++ */
++int
++rte_cpu_get_flag_enabled(enum rte_cpu_flag_t feature)
++{
++	const struct feature_entry *feat;
++	hwcap_registers_t regs = {0};
++
++	if (feature >= RTE_CPUFLAG_NUMFLAGS)
++		return -ENOENT;
++
++	feat = &rte_cpu_feature_table[feature];
++	if (feat->reg == REG_NONE)
++		return -EFAULT;
++
++	rte_cpu_get_features(regs);
++	return (regs[feat->reg] >> feat->bit) & 1;
++}
++
++const char *
++rte_cpu_get_flag_name(enum rte_cpu_flag_t feature)
++{
++	if (feature >= RTE_CPUFLAG_NUMFLAGS)
++		return NULL;
++	return rte_cpu_feature_table[feature].name;
++}
++
++void
++rte_cpu_get_intrinsics_support(struct rte_cpu_intrinsics *intrinsics)
++{
++	memset(intrinsics, 0, sizeof(*intrinsics));
++}
+diff --git a/lib/eal/riscv/rte_cycles.c b/lib/eal/riscv/rte_cycles.c
+new file mode 100644
+index 0000000000..358f271311
+--- /dev/null
++++ b/lib/eal/riscv/rte_cycles.c
+@@ -0,0 +1,77 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2015 Cavium, Inc
++ * Copyright(c) 2022 StarFive
++ * Copyright(c) 2022 SiFive
++ * Copyright(c) 2022 Semihalf
++ */
++
++#include <stdio.h>
++
++#include "eal_private.h"
++#include "rte_byteorder.h"
++#include "rte_cycles.h"
++#include "rte_log.h"
++
++/** Read generic counter frequency */
++static uint64_t
++__rte_riscv_timefrq(void)
++{
++#define TIMEBASE_FREQ_SIZE	8
++	if (RTE_RISCV_TIME_FREQ > 0)
++		return RTE_RISCV_TIME_FREQ;
++	uint8_t buf[TIMEBASE_FREQ_SIZE];
++	ssize_t cnt;
++	FILE *file;
++
++	file = fopen("/proc/device-tree/cpus/timebase-frequency", "rb");
++	if (!file)
++		goto fail;
++
++	cnt = fread(buf, 1, TIMEBASE_FREQ_SIZE, file);
++	fclose(file);
++	switch (cnt) {
++	case 8:
++		return rte_be_to_cpu_64(*(uint64_t *)buf);
++	case 4:
++		return rte_be_to_cpu_32(*(uint32_t *)buf);
++	default:
++		break;
++	}
++fail:
++	RTE_LOG(WARNING, EAL, "Unable to read timebase-frequency from FDT.\n");
++	return 0;
++}
++
++uint64_t
++get_tsc_freq_arch(void)
++{
++	RTE_LOG(NOTICE, EAL, "TSC using RISC-V %s.\n",
++		RTE_RISCV_RDTSC_USE_HPM ? "rdcycle" : "rdtime");
++	if (!RTE_RISCV_RDTSC_USE_HPM)
++		return __rte_riscv_timefrq();
++#define CYC_PER_1MHZ 1E6
++	/*
++	 * Use real time clock to estimate current cycle frequency
++	 */
++	uint64_t ticks, frq;
++	uint64_t start_ticks, cur_ticks;
++	uint64_t start_cycle, end_cycle;
++
++	/* Do not proceed unless clock frequency can be obtained. */
++	frq = __rte_riscv_timefrq();
++	if (!frq)
++		return 0;
++
++	/* Number of ticks for 1/10 second */
++	ticks = frq / 10;
++
++	start_ticks = __rte_riscv_rdtime_precise();
++	start_cycle = rte_rdtsc_precise();
++	do {
++		cur_ticks = __rte_riscv_rdtime();
++	} while ((cur_ticks - start_ticks) < ticks);
++	end_cycle = rte_rdtsc_precise();
++
++	/* Adjust the cycles to next 1Mhz */
++	return RTE_ALIGN_MUL_CEIL((end_cycle - start_cycle) * 10, CYC_PER_1MHZ);
++}
+diff --git a/lib/eal/riscv/rte_hypervisor.c b/lib/eal/riscv/rte_hypervisor.c
+new file mode 100644
+index 0000000000..92b5435993
+--- /dev/null
++++ b/lib/eal/riscv/rte_hypervisor.c
+@@ -0,0 +1,13 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2022 StarFive
++ * Copyright(c) 2022 SiFive
++ * Copyright(c) 2022 Semihalf
++ */
++
++#include "rte_hypervisor.h"
++
++enum rte_hypervisor
++rte_hypervisor_get(void)
++{
++	return RTE_HYPERVISOR_UNKNOWN;
++}
+diff --git a/lib/eal/riscv/rte_power_intrinsics.c b/lib/eal/riscv/rte_power_intrinsics.c
+new file mode 100644
+index 0000000000..240e7b6b87
+--- /dev/null
++++ b/lib/eal/riscv/rte_power_intrinsics.c
+@@ -0,0 +1,56 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2022 StarFive
++ * Copyright(c) 2022 SiFive
++ * Copyright(c) 2022 Semihalf
++ */
++
++#include "rte_power_intrinsics.h"
++
++/**
++ * This function is not supported on RISC-V 64
++ */
++int
++rte_power_monitor(const struct rte_power_monitor_cond *pmc,
++		  const uint64_t tsc_timestamp)
++{
++	RTE_SET_USED(pmc);
++	RTE_SET_USED(tsc_timestamp);
++
++	return -ENOTSUP;
++}
++
++/**
++ * This function is not supported on RISC-V 64
++ */
++int
++rte_power_pause(const uint64_t tsc_timestamp)
++{
++	RTE_SET_USED(tsc_timestamp);
++
++	return -ENOTSUP;
++}
++
++/**
++ * This function is not supported on RISC-V 64
++ */
++int
++rte_power_monitor_wakeup(const unsigned int lcore_id)
++{
++	RTE_SET_USED(lcore_id);
++
++	return -ENOTSUP;
++}
++
++/**
++ * This function is not supported on RISC-V 64
++ */
++int
++rte_power_monitor_multi(const struct rte_power_monitor_cond pmc[],
++			const uint32_t num, const uint64_t tsc_timestamp)
++{
++	RTE_SET_USED(pmc);
++	RTE_SET_USED(num);
++	RTE_SET_USED(tsc_timestamp);
++
++	return -ENOTSUP;
++}
+diff --git a/meson.build b/meson.build
+index 937f6110c0..a8db04a1ee 100644
+--- a/meson.build
++++ b/meson.build
+@@ -50,6 +50,8 @@ elif host_machine.cpu_family().startswith('arm') or host_machine.cpu_family().st
+     arch_subdir = 'arm'
+ elif host_machine.cpu_family().startswith('ppc')
+     arch_subdir = 'ppc'
++elif host_machine.cpu_family().startswith('riscv')
++    arch_subdir = 'riscv'
+ endif
+ 
+ # configure the build, and make sure configs here and in config folder are
+-- 
+2.34.1
+

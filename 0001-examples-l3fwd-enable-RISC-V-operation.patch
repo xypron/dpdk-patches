@@ -1,0 +1,70 @@
+From 20f4073bca2a6d2e72c8dcd963f9daa930f26dce Mon Sep 17 00:00:00 2001
+From: Stanislaw Kardach <kda@semihalf.com>
+Date: Thu, 5 May 2022 19:29:59 +0200
+Subject: [PATCH 1/1] examples/l3fwd: enable RISC-V operation
+
+Add missing em_mask_key() implementation and fix l3fwd_common.h
+inclusion in FIB lookup functions to enable the l3fwd to be run on
+RISC-V.
+
+Signed-off-by: Stanislaw Kardach <kda@semihalf.com>
+Sponsored-by: Frank Zhao <Frank.Zhao@starfivetech.com>
+Sponsored-by: Sam Grove <sam.grove@sifive.com>
+---
+ examples/l3fwd/l3fwd_em.c  | 8 ++++++++
+ examples/l3fwd/l3fwd_fib.c | 2 ++
+ examples/l3fwd/meson.build | 6 ------
+ 3 files changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/examples/l3fwd/l3fwd_em.c b/examples/l3fwd/l3fwd_em.c
+index 24d0910fe0..bbd3452546 100644
+--- a/examples/l3fwd/l3fwd_em.c
++++ b/examples/l3fwd/l3fwd_em.c
+@@ -239,6 +239,14 @@ em_mask_key(void *key, xmm_t mask)
+ 
+ 	return vec_and(data, mask);
+ }
++#elif defined(RTE_ARCH_RISCV)
++static inline xmm_t
++em_mask_key(void *key, xmm_t mask)
++{
++	xmm_t data = vect_load_128(key);
++
++	return vect_and(data, mask);
++}
+ #else
+ #error No vector engine (SSE, NEON, ALTIVEC) available, check your toolchain
+ #endif
+diff --git a/examples/l3fwd/l3fwd_fib.c b/examples/l3fwd/l3fwd_fib.c
+index 6e0054b4cb..bdb7d7535d 100644
+--- a/examples/l3fwd/l3fwd_fib.c
++++ b/examples/l3fwd/l3fwd_fib.c
+@@ -18,6 +18,8 @@
+ #include "l3fwd_neon.h"
+ #elif defined RTE_ARCH_PPC_64
+ #include "l3fwd_altivec.h"
++#else
++#include "l3fwd_common.h"
+ #endif
+ #include "l3fwd_event.h"
+ #include "l3fwd_route.h"
+diff --git a/examples/l3fwd/meson.build b/examples/l3fwd/meson.build
+index 75fa19b7fe..0830b3eb31 100644
+--- a/examples/l3fwd/meson.build
++++ b/examples/l3fwd/meson.build
+@@ -6,12 +6,6 @@
+ # To build this example as a standalone application with an already-installed
+ # DPDK instance, use 'make'
+ 
+-if dpdk_conf.has('RTE_ARCH_RISCV')
+-		build = false
+-		reason = 'riscv arch not supported'
+-		subdir_done()
+-endif
+-
+ allow_experimental_apis = true
+ deps += ['hash', 'lpm', 'fib', 'eventdev']
+ sources = files(
+-- 
+2.34.1
+

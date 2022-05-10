@@ -1,0 +1,42 @@
+From cb9fb3a6bb18d632f98f57c9225ba3090006b643 Mon Sep 17 00:00:00 2001
+From: Stanislaw Kardach <kda@semihalf.com>
+Date: Thu, 5 May 2022 19:30:03 +0200
+Subject: [PATCH 1/1] test/hash: report non HTM numbers for single r/w
+
+In hash_readwrite_perf_autotest a single read and write operation is
+benchmarked for both HTM and non HTM cases. However the result summary
+only shows the HTM value. Therefore add the non HTM value for
+completeness.
+
+Fixes: 0eb3726ebcf1 ("test/hash: add test for read/write concurrency")
+Cc: yipeng1.wang@intel.com
+
+Signed-off-by: Stanislaw Kardach <kda@semihalf.com>
+Sponsored-by: Frank Zhao <Frank.Zhao@starfivetech.com>
+Sponsored-by: Sam Grove <sam.grove@sifive.com>
+---
+ app/test/test_hash_readwrite.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/app/test/test_hash_readwrite.c b/app/test/test_hash_readwrite.c
+index 9b192f2b5e..6373e62d33 100644
+--- a/app/test/test_hash_readwrite.c
++++ b/app/test/test_hash_readwrite.c
+@@ -664,8 +664,12 @@ test_hash_rw_perf_main(void)
+ 	printf("Results summary:\n");
+ 	printf("================\n");
+ 
+-	printf("single read: %u\n", htm_results.single_read);
+-	printf("single write: %u\n", htm_results.single_write);
++	printf("HTM:\n");
++	printf("  single read: %u\n", htm_results.single_read);
++	printf("  single write: %u\n", htm_results.single_write);
++	printf("non HTM:\n");
++	printf("  single read: %u\n", non_htm_results.single_read);
++	printf("  single write: %u\n", non_htm_results.single_write);
+ 	for (i = 0; i < NUM_TEST; i++) {
+ 		printf("+++ core_cnt: %u +++\n", core_cnt[i]);
+ 		printf("HTM:\n");
+-- 
+2.34.1
+

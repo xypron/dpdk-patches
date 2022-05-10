@@ -1,0 +1,45 @@
+From a24916cd73bbe1e47dbdd489972c72f7c9179657 Mon Sep 17 00:00:00 2001
+From: Stanislaw Kardach <kda@semihalf.com>
+Date: Thu, 5 May 2022 19:29:58 +0200
+Subject: [PATCH 1/1] net/tap: set BPF syscall ID for RISC-V
+
+Define the missing __NR_bpf syscall id to enable the tap PMD.
+
+Signed-off-by: Stanislaw Kardach <kda@semihalf.com>
+---
+ drivers/net/tap/meson.build | 5 -----
+ drivers/net/tap/tap_bpf.h   | 2 ++
+ 2 files changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/net/tap/meson.build b/drivers/net/tap/meson.build
+index 3efac9ac07..c09713a67b 100644
+--- a/drivers/net/tap/meson.build
++++ b/drivers/net/tap/meson.build
+@@ -5,11 +5,6 @@ if not is_linux
+     build = false
+     reason = 'only supported on Linux'
+ endif
+-if arch_subdir == 'riscv'
+-		build = false
+-		reason = 'riscv arch not supported'
+-		subdir_done()
+-endif
+ sources = files(
+         'rte_eth_tap.c',
+         'tap_bpf_api.c',
+diff --git a/drivers/net/tap/tap_bpf.h b/drivers/net/tap/tap_bpf.h
+index f0b9fc7a2c..639bdf3a79 100644
+--- a/drivers/net/tap/tap_bpf.h
++++ b/drivers/net/tap/tap_bpf.h
+@@ -101,6 +101,8 @@ union bpf_attr {
+ #  define __NR_bpf 351
+ # elif defined(__powerpc__)
+ #  define __NR_bpf 361
++# elif defined(__riscv)
++#  define __NR_bpf 280
+ # else
+ #  error __NR_bpf not defined
+ # endif
+-- 
+2.34.1
+

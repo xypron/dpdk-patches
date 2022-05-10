@@ -1,0 +1,41 @@
+From b59e7e8c796c07dfe82546985fb0da85537740d2 Mon Sep 17 00:00:00 2001
+From: Stanislaw Kardach <kda@semihalf.com>
+Date: Thu, 5 May 2022 19:29:54 +0200
+Subject: [PATCH] examples/l3fwd: fix scalar LPM compilation
+
+The lpm_process_event_pkt() can either process a packet using an
+architecture specific (defined for X86/SSE, ARM/Neon and PPC64/Altivec)
+path or a scalar one. The choice is however done using an ifdef
+pre-processor macro. Because of that the scalar version was apparently
+not widely excersized/compiled.
+Due to some copy/paste errors, the scalar logic in
+lpm_process_event_pkt() retained a "continue" statement where a BAD_PORT
+should be returned after refactoring of the LPM logic in the l3fwd
+example.
+
+Fixes: 99fc91d18082 ("examples/l3fwd: add event lpm main loop")
+Cc: pbhagavatula@marvell.com
+
+Signed-off-by: Stanislaw Kardach <kda@semihalf.com>
+Sponsored-by: Frank Zhao <Frank.Zhao@starfivetech.com>
+Sponsored-by: Sam Grove <sam.grove@sifive.com>
+---
+ examples/l3fwd/l3fwd_lpm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/examples/l3fwd/l3fwd_lpm.c b/examples/l3fwd/l3fwd_lpm.c
+index bec22c44cd..6e1defbf7f 100644
+--- a/examples/l3fwd/l3fwd_lpm.c
++++ b/examples/l3fwd/l3fwd_lpm.c
+@@ -248,7 +248,7 @@ lpm_process_event_pkt(const struct lcore_conf *lconf, struct rte_mbuf *mbuf)
+ 		if (is_valid_ipv4_pkt(ipv4_hdr, mbuf->pkt_len)
+ 				< 0) {
+ 			mbuf->port = BAD_PORT;
+-			continue;
++			return mbuf->port;
+ 		}
+ 		/* Update time to live and header checksum */
+ 		--(ipv4_hdr->time_to_live);
+-- 
+2.34.1
+

@@ -1,0 +1,45 @@
+From 8942c78e5648fd67998f754e8b8acbce0f5cebed Mon Sep 17 00:00:00 2001
+From: Stanislaw Kardach <kda@semihalf.com>
+Date: Thu, 5 May 2022 19:29:57 +0200
+Subject: [PATCH 1/1] net/memif: set memfd syscall ID on RISC-V
+
+Define the missing __NR_memfd_create syscall id to enable the memif PMD.
+
+Signed-off-by: Stanislaw Kardach <kda@semihalf.com>
+---
+ drivers/net/memif/meson.build     | 5 -----
+ drivers/net/memif/rte_eth_memif.h | 2 ++
+ 2 files changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/net/memif/meson.build b/drivers/net/memif/meson.build
+index 9afb495953..680bc8631c 100644
+--- a/drivers/net/memif/meson.build
++++ b/drivers/net/memif/meson.build
+@@ -5,11 +5,6 @@ if not is_linux
+     build = false
+     reason = 'only supported on Linux'
+ endif
+-if arch_subdir == 'riscv'
+-		build = false
+-		reason = 'riscv arch not supported'
+-		subdir_done()
+-endif
+ 
+ sources = files(
+         'memif_socket.c',
+diff --git a/drivers/net/memif/rte_eth_memif.h b/drivers/net/memif/rte_eth_memif.h
+index a5ee23d42e..81e7dceae0 100644
+--- a/drivers/net/memif/rte_eth_memif.h
++++ b/drivers/net/memif/rte_eth_memif.h
+@@ -180,6 +180,8 @@ const char *memif_version(void);
+ #define __NR_memfd_create 360
+ #elif defined __i386__
+ #define __NR_memfd_create 356
++#elif defined __riscv
++#define __NR_memfd_create 279
+ #else
+ #error "__NR_memfd_create unknown for this architecture"
+ #endif
+-- 
+2.34.1
+
