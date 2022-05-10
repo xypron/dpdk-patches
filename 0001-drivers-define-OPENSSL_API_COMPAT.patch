@@ -1,7 +1,7 @@
 From 2c325eac8c0da2fe0748c724f97550c79bf1fceb Mon Sep 17 00:00:00 2001
 From: Heinrich Schuchardt <heinrich.schuchardt@canonical.com>
 Date: Tue, 10 May 2022 12:28:37 +0200
-Subject: [PATCH] drivers: define OPENSSL_API_COMPAT
+Subject: [PATCH 1/1] drivers: define OPENSSL_API_COMPAT
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit

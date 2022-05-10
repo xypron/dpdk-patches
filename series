@@ -4,7 +4,8 @@ set -e
 
 git am --quit || true
 
-git reset --hard origin/main
+git checkout build
+git reset --hard v22.03
 
 # Introduce support for RISC-V architecture
 # https://inbox.dpdk.org/dev/20220505173003.3242618-1-kda@semihalf.com/

@@ -11,29 +11,29 @@ Signed-off-by: Stanislaw Kardach <kda@semihalf.com>
 Sponsored-by: Frank Zhao <Frank.Zhao@starfivetech.com>
 Sponsored-by: Sam Grove <sam.grove@sifive.com>
 ---
- doc/guides/rel_notes/release_22_07.rst |   5 +
+ doc/guides/rel_notes/release_22_03.rst |   5 +
  lib/lpm/meson.build                    |   1 +
  lib/lpm/rte_lpm.h                      |   4 +-
  lib/lpm/rte_lpm_scalar.h               | 122 +++++++++++++++++++++++++
  4 files changed, 131 insertions(+), 1 deletion(-)
  create mode 100644 lib/lpm/rte_lpm_scalar.h
 
-diff --git a/doc/guides/rel_notes/release_22_07.rst b/doc/guides/rel_notes/release_22_07.rst
+diff --git a/doc/guides/rel_notes/release_22_03.rst b/doc/guides/rel_notes/release_22_03.rst
 index 4ae91dd94d..29689c25cd 100644
---- a/doc/guides/rel_notes/release_22_07.rst
-+++ b/doc/guides/rel_notes/release_22_07.rst
+--- a/doc/guides/rel_notes/release_22_03.rst
++++ b/doc/guides/rel_notes/release_22_03.rst
 @@ -65,6 +65,11 @@ New Features
-   * Added support for promiscuous mode on Windows.
-   * Added support for MTU on Windows.
- 
+ New Features
+ ------------
+
 +* **Added scalar version of the LPM library.**
 +
 +  * Added scalar implementation of ``rte_lpm_lookupx4``. This is a fall-back
 +    implementation for platforms that don't support vector operations.
 +
- * **Updated Marvell cnxk crypto driver.**
+ * **Added ability to reuse hugepages in Linux.**
  
-   * Added AH mode support in lookaside protocol (IPsec) for CN9K & CN10K.
+   It is now possible to reuse files in hugetlbfs to speed up hugepage mapping,
 diff --git a/lib/lpm/meson.build b/lib/lpm/meson.build
 index 78d91d3421..6b47361fce 100644
 --- a/lib/lpm/meson.build

@@ -63,7 +63,7 @@ Sponsored-by: Sam Grove <sam.grove@sifive.com>
  doc/guides/linux_gsg/index.rst                |   1 +
  doc/guides/nics/features.rst                  |   5 +
  doc/guides/nics/features/default.ini          |   1 +
- doc/guides/rel_notes/release_22_07.rst        |  23 +++
+ doc/guides/rel_notes/release_22_03.rst        |  23 +++
  drivers/net/i40e/meson.build                  |   6 +
  drivers/net/ixgbe/meson.build                 |   6 +
  drivers/net/memif/meson.build                 |   5 +
@@ -562,13 +562,13 @@ index b1d18ac62c..02198682c6 100644
  Usage doc            =
  Design doc           =
  Perf doc             =
-diff --git a/doc/guides/rel_notes/release_22_07.rst b/doc/guides/rel_notes/release_22_07.rst
+diff --git a/doc/guides/rel_notes/release_22_03.rst b/doc/guides/rel_notes/release_22_03.rst
 index 29689c25cd..d851886176 100644
---- a/doc/guides/rel_notes/release_22_07.rst
-+++ b/doc/guides/rel_notes/release_22_07.rst
+--- a/doc/guides/rel_notes/release_22_03.rst
++++ b/doc/guides/rel_notes/release_22_03.rst
 @@ -55,6 +55,29 @@ New Features
-      Also, make sure to start the actual text at the margin.
-      =======================================================
+ New Features
+ ------------
  
 +* **Added initial RISC-V architecture support.***
 +
@@ -593,9 +593,9 @@ index 29689c25cd..d851886176 100644
 +    ``test_ring.c`` where extensive inlining increases the code size beyond the
 +    capability of the generated instruction (JAL: +/-1MB PC-relative).
 +
- * **Updated Intel iavf driver.**
+ * **Added scalar version of the LPM library.**
  
-   * Added Tx QoS queue rate limitation support.
+   * Added scalar implementation of ``rte_lpm_lookupx4``. This is a fall-back
 diff --git a/drivers/net/i40e/meson.build b/drivers/net/i40e/meson.build
 index efc5f93e35..a4c1c9079a 100644
 --- a/drivers/net/i40e/meson.build

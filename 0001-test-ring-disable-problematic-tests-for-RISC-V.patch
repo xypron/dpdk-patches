@@ -24,7 +24,7 @@ Sponsored-by: Sam Grove <sam.grove@sifive.com>
 ---
  app/test/test_ring.c                   | 8 ++++++++
  config/riscv/meson.build               | 5 +++++
- doc/guides/rel_notes/release_22_07.rst | 3 ++-
+ doc/guides/rel_notes/release_22_03.rst | 3 ++-
  3 files changed, 15 insertions(+), 1 deletion(-)
 
 diff --git a/app/test/test_ring.c b/app/test/test_ring.c
@@ -79,10 +79,10 @@ index 0c16c31fc2..50d0b513bf 100644
 +if get_option('optimization') == '0' or get_option('optimization') == 'g'
 +    add_project_arguments('-DRTE_RISCV_WO_DISABLE_RING_TESTS', language: 'c')
 +endif
-diff --git a/doc/guides/rel_notes/release_22_07.rst b/doc/guides/rel_notes/release_22_07.rst
+diff --git a/doc/guides/rel_notes/release_22_03.rst b/doc/guides/rel_notes/release_22_03.rst
 index d851886176..beabba16eb 100644
---- a/doc/guides/rel_notes/release_22_07.rst
-+++ b/doc/guides/rel_notes/release_22_07.rst
+--- a/doc/guides/rel_notes/release_22_03.rst
++++ b/doc/guides/rel_notes/release_22_03.rst
 @@ -76,7 +76,8 @@ New Features
    * Debug build of ``app/test/dpdk-test`` fails currently on RISC-V due to
      seemingly invalid loop and goto jump code generation by GCC in
@@ -91,7 +91,7 @@ index d851886176..beabba16eb 100644
 +    capability of the generated instruction (JAL: +/-1MB PC-relative). The
 +    workaround is to disable ``test_ring_basic_ex()`` and ``test_ring_with_exact_size()`` on RISC-V on ``-O0`` or ``-Og``.
  
- * **Updated Intel iavf driver.**
+ * **Added scalar version of the LPM library.**
  
 -- 
 2.34.1
