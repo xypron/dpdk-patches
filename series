@@ -19,3 +19,5 @@ git am ../patches/0001-test-cpuflags-add-test-for-RISC-V-cpu-flag.patch
 git am ../patches/0001-test-ring-disable-problematic-tests-for-RISC-V.patch
 git am ../patches/0001-devtools-add-RISC-V-to-test-meson-builds.sh.patch
 git am ../patches/0001-test-hash-report-non-HTM-numbers-for-single-r-w.patch
+
+git am ../patches/0001-drivers-define-OPENSSL_API_COMPAT.patch

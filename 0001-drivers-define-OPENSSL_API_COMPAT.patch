@@ -1,0 +1,99 @@
+From 2c325eac8c0da2fe0748c724f97550c79bf1fceb Mon Sep 17 00:00:00 2001
+From: Heinrich Schuchardt <heinrich.schuchardt@canonical.com>
+Date: Tue, 10 May 2022 12:28:37 +0200
+Subject: [PATCH] drivers: define OPENSSL_API_COMPAT
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The API of the OpenSSL library has changed with version 3.0. This results
+in a lot of compiler warnings like
+
+    ../dpdk/drivers/crypto/ccp/ccp_crypto.c:182:9:
+    warning: ‘SHA256_Transform’ is deprecated:
+    Since OpenSSL 3.0 [-Wdeprecated-declarations]
+
+As many Linux distributions still use elder OpenSSL libraries we cannot
+change the used API now. Instead define OPENSSL_API_COMPAT to indicate
+that we are using the OpenSSL 1.1.0 API.
+
+OPENSSL_API_COMPAT is introduced in *.c files and not in *.h files as some
+*.c files directly include OpenSSL headers.
+
+Signed-off-by: Heinrich Schuchardt <heinrich.schuchardt@canonical.com>
+---
+ drivers/crypto/ccp/ccp_crypto.c              | 2 ++
+ drivers/crypto/openssl/rte_openssl_pmd.c     | 2 ++
+ drivers/crypto/openssl/rte_openssl_pmd_ops.c | 2 ++
+ drivers/crypto/qat/qat_sym.c                 | 2 ++
+ drivers/crypto/qat/qat_sym_session.c         | 2 ++
+ 5 files changed, 10 insertions(+)
+
+diff --git a/drivers/crypto/ccp/ccp_crypto.c b/drivers/crypto/ccp/ccp_crypto.c
+index 4ed91a7436..4bab18323b 100644
+--- a/drivers/crypto/ccp/ccp_crypto.c
++++ b/drivers/crypto/ccp/ccp_crypto.c
+@@ -2,6 +2,8 @@
+  *   Copyright(c) 2018 Advanced Micro Devices, Inc. All rights reserved.
+  */
+ 
++#define OPENSSL_API_COMPAT 0x10100000L
++
+ #include <dirent.h>
+ #include <fcntl.h>
+ #include <stdio.h>
+diff --git a/drivers/crypto/openssl/rte_openssl_pmd.c b/drivers/crypto/openssl/rte_openssl_pmd.c
+index d80e1052e2..4f331af157 100644
+--- a/drivers/crypto/openssl/rte_openssl_pmd.c
++++ b/drivers/crypto/openssl/rte_openssl_pmd.c
+@@ -2,6 +2,8 @@
+  * Copyright(c) 2016-2017 Intel Corporation
+  */
+ 
++#define OPENSSL_API_COMPAT 0x10100000L
++
+ #include <rte_common.h>
+ #include <rte_hexdump.h>
+ #include <rte_cryptodev.h>
+diff --git a/drivers/crypto/openssl/rte_openssl_pmd_ops.c b/drivers/crypto/openssl/rte_openssl_pmd_ops.c
+index 1cb07794bd..87c395a836 100644
+--- a/drivers/crypto/openssl/rte_openssl_pmd_ops.c
++++ b/drivers/crypto/openssl/rte_openssl_pmd_ops.c
+@@ -2,6 +2,8 @@
+  * Copyright(c) 2016-2017 Intel Corporation
+  */
+ 
++#define OPENSSL_API_COMPAT 0x10100000L
++
+ #include <string.h>
+ 
+ #include <rte_common.h>
+diff --git a/drivers/crypto/qat/qat_sym.c b/drivers/crypto/qat/qat_sym.c
+index ca8c9a8124..3a6c9dcc0a 100644
+--- a/drivers/crypto/qat/qat_sym.c
++++ b/drivers/crypto/qat/qat_sym.c
+@@ -2,6 +2,8 @@
+  * Copyright(c) 2015-2022 Intel Corporation
+  */
+ 
++#define OPENSSL_API_COMPAT 0x10100000L
++
+ #include <openssl/evp.h>
+ 
+ #include <rte_mempool.h>
+diff --git a/drivers/crypto/qat/qat_sym_session.c b/drivers/crypto/qat/qat_sym_session.c
+index 9d6a19c0be..737a180810 100644
+--- a/drivers/crypto/qat/qat_sym_session.c
++++ b/drivers/crypto/qat/qat_sym_session.c
+@@ -2,6 +2,8 @@
+  * Copyright(c) 2015-2022 Intel Corporation
+  */
+ 
++#define OPENSSL_API_COMPAT 0x10100000L
++
+ #include <openssl/sha.h>	/* Needed to calculate pre-compute values */
+ #include <openssl/aes.h>	/* Needed to calculate pre-compute values */
+ #include <openssl/md5.h>	/* Needed to calculate pre-compute values */
+-- 
+2.34.1
+
