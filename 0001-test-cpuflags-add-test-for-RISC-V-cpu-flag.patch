@@ -1,14 +1,14 @@
-From 32883bdbe18aa2a250d0a4b4946ad621f9b6ea46 Mon Sep 17 00:00:00 2001
+From f16b5dfc3f121d72d9ecd50e9013516d35137f74 Mon Sep 17 00:00:00 2001
 From: Michal Mazurek <maz@semihalf.com>
-Date: Thu, 5 May 2022 19:30:00 +0200
+Date: Tue, 10 May 2022 17:48:47 +0200
 Subject: [PATCH 1/1] test/cpuflags: add test for RISC-V cpu flag
 
 Add checks for all flag values defined in the RISC-V misa CSR register.
 
-Signed-off-by: Michal Mazurek <maz@semihalf.com>
-Signed-off-by: Stanislaw Kardach <kda@semihalf.com>
 Sponsored-by: Frank Zhao <Frank.Zhao@starfivetech.com>
 Sponsored-by: Sam Grove <sam.grove@sifive.com>
+Signed-off-by: Michal Mazurek <maz@semihalf.com>
+Signed-off-by: Stanislaw Kardach <kda@semihalf.com>
 ---
  app/test/test_cpuflags.c | 81 ++++++++++++++++++++++++++++++++++++++++
  1 file changed, 81 insertions(+)

@@ -1,10 +1,12 @@
-From a24916cd73bbe1e47dbdd489972c72f7c9179657 Mon Sep 17 00:00:00 2001
+From d36dbc1767d49e6898a3cc1bc1545b4e938f65f5 Mon Sep 17 00:00:00 2001
 From: Stanislaw Kardach <kda@semihalf.com>
-Date: Thu, 5 May 2022 19:29:58 +0200
+Date: Tue, 10 May 2022 17:48:45 +0200
 Subject: [PATCH 1/1] net/tap: set BPF syscall ID for RISC-V
 
 Define the missing __NR_bpf syscall id to enable the tap PMD.
 
+Sponsored-by: Frank Zhao <Frank.Zhao@starfivetech.com>
+Sponsored-by: Sam Grove <sam.grove@sifive.com>
 Signed-off-by: Stanislaw Kardach <kda@semihalf.com>
 ---
  drivers/net/tap/meson.build | 5 -----

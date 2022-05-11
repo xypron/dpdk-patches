@@ -1,15 +1,16 @@
-From 017bc2a3bdeb0790d00c9cb36a6fac15dc4503ba Mon Sep 17 00:00:00 2001
+From 1ebf7aa527fc174a29e485fa414fab934c7d195f Mon Sep 17 00:00:00 2001
 From: Michal Mazurek <maz@semihalf.com>
-Date: Thu, 5 May 2022 19:29:53 +0200
+Date: Tue, 10 May 2022 13:58:24 +0200
 Subject: [PATCH 1/1] lpm: add a scalar version of lookupx4 function
 
 Add an implementation of the rte_lpm_lookupx4() function for platforms
 without support for vector operations.
 
+This will be useful in the upcoming RISC-V port as well as any platform
+which may want to start with a basic level of LPM support.
+
 Signed-off-by: Michal Mazurek <maz@semihalf.com>
 Signed-off-by: Stanislaw Kardach <kda@semihalf.com>
-Sponsored-by: Frank Zhao <Frank.Zhao@starfivetech.com>
-Sponsored-by: Sam Grove <sam.grove@sifive.com>
 ---
  doc/guides/rel_notes/release_22_07.rst |   5 +
  lib/lpm/meson.build                    |   1 +
@@ -19,21 +20,21 @@ Sponsored-by: Sam Grove <sam.grove@sifive.com>
  create mode 100644 lib/lpm/rte_lpm_scalar.h
 
 diff --git a/doc/guides/rel_notes/release_22_07.rst b/doc/guides/rel_notes/release_22_07.rst
-index 4ae91dd94d..29689c25cd 100644
+index e014247bc0..e435e29f55 100644
 --- a/doc/guides/rel_notes/release_22_07.rst
 +++ b/doc/guides/rel_notes/release_22_07.rst
-@@ -65,6 +65,11 @@ New Features
-   * Added support for promiscuous mode on Windows.
-   * Added support for MTU on Windows.
+@@ -78,6 +78,11 @@ New Features
+   * Added AH mode support in lookaside protocol (IPsec) for CN9K & CN10K.
+   * Added AES-GMAC support in lookaside protocol (IPsec) for CN9K & CN10K.
  
 +* **Added scalar version of the LPM library.**
 +
 +  * Added scalar implementation of ``rte_lpm_lookupx4``. This is a fall-back
 +    implementation for platforms that don't support vector operations.
 +
- * **Updated Marvell cnxk crypto driver.**
  
-   * Added AH mode support in lookaside protocol (IPsec) for CN9K & CN10K.
+ Removed Items
+ -------------
 diff --git a/lib/lpm/meson.build b/lib/lpm/meson.build
 index 78d91d3421..6b47361fce 100644
 --- a/lib/lpm/meson.build

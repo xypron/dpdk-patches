@@ -1,10 +1,12 @@
-From 8942c78e5648fd67998f754e8b8acbce0f5cebed Mon Sep 17 00:00:00 2001
+From fdda454f684100e15c5295923aff03c53b636e5c Mon Sep 17 00:00:00 2001
 From: Stanislaw Kardach <kda@semihalf.com>
-Date: Thu, 5 May 2022 19:29:57 +0200
+Date: Tue, 10 May 2022 17:48:44 +0200
 Subject: [PATCH 1/1] net/memif: set memfd syscall ID on RISC-V
 
 Define the missing __NR_memfd_create syscall id to enable the memif PMD.
 
+Sponsored-by: Frank Zhao <Frank.Zhao@starfivetech.com>
+Sponsored-by: Sam Grove <sam.grove@sifive.com>
 Signed-off-by: Stanislaw Kardach <kda@semihalf.com>
 ---
  drivers/net/memif/meson.build     | 5 -----

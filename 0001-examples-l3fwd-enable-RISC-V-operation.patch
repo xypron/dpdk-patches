@@ -1,15 +1,15 @@
-From 20f4073bca2a6d2e72c8dcd963f9daa930f26dce Mon Sep 17 00:00:00 2001
+From e08c9bc813af9e43352eb4aab3a7480741de3d39 Mon Sep 17 00:00:00 2001
 From: Stanislaw Kardach <kda@semihalf.com>
-Date: Thu, 5 May 2022 19:29:59 +0200
-Subject: [PATCH 1/1] examples/l3fwd: enable RISC-V operation
+Date: Tue, 10 May 2022 17:48:46 +0200
+Subject: [PATCH] examples/l3fwd: enable RISC-V operation
 
 Add missing em_mask_key() implementation and fix l3fwd_common.h
 inclusion in FIB lookup functions to enable the l3fwd to be run on
 RISC-V.
 
-Signed-off-by: Stanislaw Kardach <kda@semihalf.com>
 Sponsored-by: Frank Zhao <Frank.Zhao@starfivetech.com>
 Sponsored-by: Sam Grove <sam.grove@sifive.com>
+Signed-off-by: Stanislaw Kardach <kda@semihalf.com>
 ---
  examples/l3fwd/l3fwd_em.c  | 8 ++++++++
  examples/l3fwd/l3fwd_fib.c | 2 ++

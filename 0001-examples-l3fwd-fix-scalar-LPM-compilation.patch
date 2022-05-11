@@ -1,7 +1,7 @@
-From b59e7e8c796c07dfe82546985fb0da85537740d2 Mon Sep 17 00:00:00 2001
+From 8490be9d871407786cd32cd6e96c9d7150beb83e Mon Sep 17 00:00:00 2001
 From: Stanislaw Kardach <kda@semihalf.com>
-Date: Thu, 5 May 2022 19:29:54 +0200
-Subject: [PATCH] examples/l3fwd: fix scalar LPM compilation
+Date: Tue, 10 May 2022 13:58:44 +0200
+Subject: [PATCH 1/1] examples/l3fwd: fix scalar LPM compilation
 
 The lpm_process_event_pkt() can either process a packet using an
 architecture specific (defined for X86/SSE, ARM/Neon and PPC64/Altivec)
@@ -17,8 +17,7 @@ Fixes: 99fc91d18082 ("examples/l3fwd: add event lpm main loop")
 Cc: pbhagavatula@marvell.com
 
 Signed-off-by: Stanislaw Kardach <kda@semihalf.com>
-Sponsored-by: Frank Zhao <Frank.Zhao@starfivetech.com>
-Sponsored-by: Sam Grove <sam.grove@sifive.com>
+Signed-off-by: Heinrich Schuchardt <heinrich.schuchardt@canonical.com>
 ---
  examples/l3fwd/l3fwd_lpm.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)

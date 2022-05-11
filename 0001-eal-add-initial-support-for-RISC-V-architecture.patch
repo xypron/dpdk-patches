@@ -1,6 +1,6 @@
-From cee1c1193c3e72aba2d2d5caec84ffa505f7d455 Mon Sep 17 00:00:00 2001
+From c7d128a39f0d93affd091d82b224dc10965f7722 Mon Sep 17 00:00:00 2001
 From: Michal Mazurek <maz@semihalf.com>
-Date: Thu, 5 May 2022 19:29:55 +0200
+Date: Tue, 10 May 2022 17:48:42 +0200
 Subject: [PATCH 1/1] eal: add initial support for RISC-V architecture
 
 Add all necessary elements for DPDK to compile and run EAL on SiFive
@@ -16,6 +16,8 @@ This includes:
   U74 core.
 
 Compilation was tested on Ubuntu and Arch Linux using riscv64 toolchain.
+Clang compilation currently not supported due to issues with missing
+relocation relaxation.
 
 Two rte_rdtsc() schemes are provided: stable low-resolution using rdtime
 (default) and unstable high-resolution using rdcycle. User can override
@@ -35,6 +37,9 @@ implementation uses the timebase-frequency device-tree node read through
 the proc file system. Such approach was chosen because Linux kernel
 depends on the presence of this device-tree node.
 
+The i40e PMD driver is disabled on RISC-V as the rv64gc ISA has no vector
+operations.
+
 The compilation of following modules has been disabled by this commit
 and will be re-enabled in later commits as fixes are introduced:
 net/ixgbe, net/memif, net/tap, example/l3fwd.
@@ -47,10 +52,10 @@ Known checkpatch errors/warnings:
 - rte_*mb() used directly in rte_atomic.h to reduce code duplication.
 - __atomic_thread_fence() used to implement rte_atomic_thread_fence().
 
-Signed-off-by: Michal Mazurek <maz@semihalf.com>
-Signed-off-by: Stanislaw Kardach <kda@semihalf.com>
 Sponsored-by: Frank Zhao <Frank.Zhao@starfivetech.com>
 Sponsored-by: Sam Grove <sam.grove@sifive.com>
+Signed-off-by: Michal Mazurek <maz@semihalf.com>
+Signed-off-by: Stanislaw Kardach <kda@semihalf.com>
 ---
  MAINTAINERS                                   |   6 +
  app/test/test_xmmt_ops.h                      |  16 ++
@@ -63,7 +68,7 @@ Sponsored-by: Sam Grove <sam.grove@sifive.com>
  doc/guides/linux_gsg/index.rst                |   1 +
  doc/guides/nics/features.rst                  |   5 +
  doc/guides/nics/features/default.ini          |   1 +
- doc/guides/rel_notes/release_22_07.rst        |  23 +++
+ doc/guides/rel_notes/release_22_07.rst        |   8 +
  drivers/net/i40e/meson.build                  |   6 +
  drivers/net/ixgbe/meson.build                 |   6 +
  drivers/net/memif/meson.build                 |   5 +
@@ -73,7 +78,7 @@ Sponsored-by: Sam Grove <sam.grove@sifive.com>
  lib/eal/riscv/include/rte_atomic.h            |  52 +++++++
  lib/eal/riscv/include/rte_byteorder.h         |  44 ++++++
  lib/eal/riscv/include/rte_cpuflags.h          |  55 +++++++
- lib/eal/riscv/include/rte_cycles.h            | 103 +++++++++++++
+ lib/eal/riscv/include/rte_cycles.h            | 105 +++++++++++++
  lib/eal/riscv/include/rte_io.h                |  21 +++
  lib/eal/riscv/include/rte_mcslock.h           |  18 +++
  lib/eal/riscv/include/rte_memcpy.h            |  63 ++++++++
@@ -91,7 +96,7 @@ Sponsored-by: Sam Grove <sam.grove@sifive.com>
  lib/eal/riscv/rte_hypervisor.c                |  13 ++
  lib/eal/riscv/rte_power_intrinsics.c          |  56 +++++++
  meson.build                                   |   2 +
- 39 files changed, 1354 insertions(+), 1 deletion(-)
+ 39 files changed, 1341 insertions(+), 1 deletion(-)
  create mode 100644 config/riscv/meson.build
  create mode 100644 config/riscv/riscv64_linux_gcc
  create mode 100644 config/riscv/riscv64_sifive_u740_linux_gcc
@@ -119,7 +124,7 @@ Sponsored-by: Sam Grove <sam.grove@sifive.com>
  create mode 100644 lib/eal/riscv/rte_power_intrinsics.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 7c4f541dba..2c732a1912 100644
+index 8f4e9c3479..7fb6dccc41 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
 @@ -296,6 +296,12 @@ F: drivers/*/*/*_altivec.*
@@ -134,7 +139,7 @@ index 7c4f541dba..2c732a1912 100644
 +
  Intel x86
  M: Bruce Richardson <bruce.richardson@intel.com>
- M: Konstantin Ananyev <konstantin.ananyev@intel.com>
+ M: Konstantin Ananyev <konstantin.v.ananyev@yandex.ru>
 diff --git a/app/test/test_xmmt_ops.h b/app/test/test_xmmt_ops.h
 index 3a82d5ecac..55f256599e 100644
 --- a/app/test/test_xmmt_ops.h
@@ -563,10 +568,10 @@ index b1d18ac62c..02198682c6 100644
  Design doc           =
  Perf doc             =
 diff --git a/doc/guides/rel_notes/release_22_07.rst b/doc/guides/rel_notes/release_22_07.rst
-index 29689c25cd..d851886176 100644
+index 4ae91dd94d..e014247bc0 100644
 --- a/doc/guides/rel_notes/release_22_07.rst
 +++ b/doc/guides/rel_notes/release_22_07.rst
-@@ -55,6 +55,29 @@ New Features
+@@ -55,6 +55,14 @@ New Features
       Also, make sure to start the actual text at the margin.
       =======================================================
  
@@ -577,21 +582,6 @@ index 29689c25cd..d851886176 100644
 +  SiFive Freedom U740 SoC. In theory this implementation should work with any
 +  ``rv64gc`` ISA compatible implementation with MMU supporting a reasonable
 +  address space size (U740 uses sv39 MMU).
-+
-+  * Verified with meson tests. ``fast-tests`` suite passing with default config.
-+  * Verified PMD operation with Intel x520-DA2 NIC (``ixgbe``) and ``test-pmd``
-+    application. Packet transfer checked using all UIO drivers available for
-+    non-IOMMU platforms: ``uio_pci_generic``, ``vfio-pci noiommu`` and
-+    ``igb_uio``.
-+  * The ``i40e`` PMD driver is disabled on RISC-V as ``rv64gc`` ISA has no
-+    vector operations.
-+  * RISCV support is currently limited to Linux.
-+  * Clang compilation currently not supported due to issues with relocation
-+    relaxation.
-+  * Debug build of ``app/test/dpdk-test`` fails currently on RISC-V due to
-+    seemingly invalid loop and goto jump code generation by GCC in
-+    ``test_ring.c`` where extensive inlining increases the code size beyond the
-+    capability of the generated instruction (JAL: +/-1MB PC-relative).
 +
  * **Updated Intel iavf driver.**
  
@@ -681,7 +671,7 @@ index 0830b3eb31..75fa19b7fe 100644
  sources = files(
 diff --git a/lib/eal/riscv/include/meson.build b/lib/eal/riscv/include/meson.build
 new file mode 100644
-index 0000000000..d290ed82ed
+index 0000000000..7f6e4a5b1e
 --- /dev/null
 +++ b/lib/eal/riscv/include/meson.build
 @@ -0,0 +1,23 @@
@@ -691,21 +681,21 @@ index 0000000000..d290ed82ed
 +# Copyright(c) 2022 Semihalf
 +
 +arch_headers = files(
-+	'rte_atomic.h',
-+	'rte_byteorder.h',
-+	'rte_cpuflags.h',
-+	'rte_cycles.h',
-+	'rte_io.h',
-+	'rte_mcslock.h',
-+	'rte_memcpy.h',
-+	'rte_pause.h',
-+	'rte_pflock.h',
-+	'rte_power_intrinsics.h',
-+	'rte_prefetch.h',
-+	'rte_rwlock.h',
-+	'rte_spinlock.h',
-+	'rte_ticketlock.h',
-+	'rte_vect.h'
++        'rte_atomic.h',
++        'rte_byteorder.h',
++        'rte_cpuflags.h',
++        'rte_cycles.h',
++        'rte_io.h',
++        'rte_mcslock.h',
++        'rte_memcpy.h',
++        'rte_pause.h',
++        'rte_pflock.h',
++        'rte_power_intrinsics.h',
++        'rte_prefetch.h',
++        'rte_rwlock.h',
++        'rte_spinlock.h',
++        'rte_ticketlock.h',
++        'rte_vect.h',
 +)
 +install_headers(arch_headers, subdir: get_option('include_subdir_arch'))
 diff --git a/lib/eal/riscv/include/rte_atomic.h b/lib/eal/riscv/include/rte_atomic.h
@@ -879,10 +869,10 @@ index 0000000000..66e787f898
 +#endif /* RTE_CPUFLAGS_RISCV_H */
 diff --git a/lib/eal/riscv/include/rte_cycles.h b/lib/eal/riscv/include/rte_cycles.h
 new file mode 100644
-index 0000000000..1eb6e2bad2
+index 0000000000..8353cea853
 --- /dev/null
 +++ b/lib/eal/riscv/include/rte_cycles.h
-@@ -0,0 +1,103 @@
+@@ -0,0 +1,105 @@
 +/* SPDX-License-Identifier: BSD-3-Clause
 + * Copyright(c) 2015 Cavium, Inc
 + * Copyright(c) 2022 StarFive
@@ -980,6 +970,8 @@ index 0000000000..1eb6e2bad2
 +{
 +	return rte_rdtsc();
 +}
++
++#undef RV64_CSRR
 +
 +#ifdef __cplusplus
 +}
@@ -1463,7 +1455,7 @@ index 0000000000..4600521c20
 +#endif /* RTE_VECT_RISCV_H */
 diff --git a/lib/eal/riscv/meson.build b/lib/eal/riscv/meson.build
 new file mode 100644
-index 0000000000..6ec53ea03a
+index 0000000000..dca1106aae
 --- /dev/null
 +++ b/lib/eal/riscv/meson.build
 @@ -0,0 +1,11 @@
@@ -1473,10 +1465,10 @@ index 0000000000..6ec53ea03a
 +subdir('include')
 +
 +sources += files(
-+	'rte_cpuflags.c',
-+	'rte_cycles.c',
-+	'rte_hypervisor.c',
-+	'rte_power_intrinsics.c',
++        'rte_cpuflags.c',
++        'rte_cycles.c',
++        'rte_hypervisor.c',
++        'rte_power_intrinsics.c',
 +)
 diff --git a/lib/eal/riscv/rte_cpuflags.c b/lib/eal/riscv/rte_cpuflags.c
 new file mode 100644

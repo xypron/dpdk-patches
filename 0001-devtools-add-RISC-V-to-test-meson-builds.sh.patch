@@ -1,32 +1,30 @@
-From e8b3565f90a814f2bd9d23bbe89be4a40093c25e Mon Sep 17 00:00:00 2001
+From 69b4c270aea8f3891b7c1036689db2a62548e397 Mon Sep 17 00:00:00 2001
 From: Stanislaw Kardach <kda@semihalf.com>
-Date: Thu, 5 May 2022 19:30:02 +0200
+Date: Tue, 10 May 2022 17:48:48 +0200
 Subject: [PATCH 1/1] devtools: add RISC-V to test-meson-builds.sh
 
 Validate RISC-V compilation when test-meson-builds.sh is called. The
 check will be only performed if appropriate toolchain is present on the
 system (same as with other architectures).
 
-Signed-off-by: Stanislaw Kardach <kda@semihalf.com>
 Sponsored-by: Frank Zhao <Frank.Zhao@starfivetech.com>
 Sponsored-by: Sam Grove <sam.grove@sifive.com>
+Signed-off-by: Stanislaw Kardach <kda@semihalf.com>
 ---
- devtools/test-meson-builds.sh | 6 ++++++
- 1 file changed, 6 insertions(+)
+ devtools/test-meson-builds.sh | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/devtools/test-meson-builds.sh b/devtools/test-meson-builds.sh
-index a653b253cb..12513e9d7f 100755
+index a653b253cb..f732dccf6c 100755
 --- a/devtools/test-meson-builds.sh
 +++ b/devtools/test-meson-builds.sh
-@@ -275,6 +275,12 @@ for f in $srcdir/config/ppc/ppc* ; do
+@@ -275,6 +275,10 @@ for f in $srcdir/config/ppc/ppc* ; do
  	build $targetdir $f ABI $use_shared
  done
  
-+# RISC-V configurations
-+for f in $srcdir/config/riscv/riscv* ; do
-+	targetdir=build-$(basename $f | tr '_' '-' | cut -d'-' -f-2)
-+	build $targetdir $f ABI $use_shared
-+done
++# RISC-V configuration
++build build-riscv64-linux-gcc $srcdir/config/riscv/riscv64_linux_gcc ABI \
++	$use_shared
 +
  # Test installation of the x86-generic target, to be used for checking
  # the sample apps build using the pkg-config file for cflags and libs
