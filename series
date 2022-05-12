@@ -29,5 +29,6 @@ git am ../patches/0001-examples-l3fwd-enable-RISC-V-operation.patch
 git am ../patches/0001-test-cpuflags-add-test-for-RISC-V-cpu-flag.patch
 git am ../patches/0001-devtools-add-RISC-V-to-test-meson-builds.sh.patch
 git am ../patches/0001-ci-add-RISCV64-cross-compilation-job.patch
-
+# [PATCH 1/1] drivers: define OPENSSL_API_COMPAT
+# https://inbox.dpdk.org/dev/20220510150635.61975-1-heinrich.schuchardt@canonical.com/
 git am ../patches/0001-drivers-define-OPENSSL_API_COMPAT.patch
