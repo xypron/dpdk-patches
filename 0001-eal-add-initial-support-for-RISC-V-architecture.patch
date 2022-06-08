@@ -583,9 +583,9 @@ index 4ae91dd94d..e014247bc0 100644
 +  ``rv64gc`` ISA compatible implementation with MMU supporting a reasonable
 +  address space size (U740 uses sv39 MMU).
 +
- * **Updated Intel iavf driver.**
+ * **Added Sequence Lock.**
  
-   * Added Tx QoS queue rate limitation support.
+   Added a new synchronization primitive: the sequence lock
 diff --git a/drivers/net/i40e/meson.build b/drivers/net/i40e/meson.build
 index efc5f93e35..a4c1c9079a 100644
 --- a/drivers/net/i40e/meson.build

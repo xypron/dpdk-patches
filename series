@@ -9,16 +9,16 @@ git reset --hard origin/main
 
 # [PATCH 1/1] lpm: add a scalar version of lookupx4 function
 # https://inbox.dpdk.org/dev/20220510115824.457885-1-kda@semihalf.com/
-git am ../patches/0001-lpm-add-a-scalar-version-of-lookupx4-function.patch
+# git am ../patches/0001-lpm-add-a-scalar-version-of-lookupx4-function.patch
 # [PATCH 1/1] examples/l3fwd: fix scalar LPM compilation
 # https://inbox.dpdk.org/dev/20220510115844.458009-1-kda@semihalf.com/
-git am ../patches/0001-examples-l3fwd-fix-scalar-LPM-compilation.patch
+# git am ../patches/0001-examples-l3fwd-fix-scalar-LPM-compilation.patch
 # [PATCH 1/1] test/hash: report non HTM numbers for single r/w
 # https://inbox.dpdk.org/dev/20220510115734.457718-1-kda@semihalf.com/
-git am ../patches/0001-test-hash-report-non-HTM-numbers-for-single-r-w.patch
+# git am ../patches/0001-test-hash-report-non-HTM-numbers-for-single-r-w.patch
 # [PATCH 1/1] test/ring: remove excessive inlining
 # https://inbox.dpdk.org/dev/20220510115758.457794-1-kda@semihalf.com/
-git am ../patches/0001-test-ring-remove-excessive-inlining.patch
+# git am ../patches/0001-test-ring-remove-excessive-inlining.patch
 # [PATCH v3 0/8] Introduce support for RISC-V architecture
 # https://inbox.dpdk.org/dev/20220510154849.530872-1-kda@semihalf.com/
 git am ../patches/0001-eal-add-initial-support-for-RISC-V-architecture.patch
@@ -31,4 +31,4 @@ git am ../patches/0001-devtools-add-RISC-V-to-test-meson-builds.sh.patch
 git am ../patches/0001-ci-add-RISCV64-cross-compilation-job.patch
 # [PATCH 1/1] drivers: define OPENSSL_API_COMPAT
 # https://inbox.dpdk.org/dev/20220510150635.61975-1-heinrich.schuchardt@canonical.com/
-git am ../patches/0001-drivers-define-OPENSSL_API_COMPAT.patch
+# git am ../patches/0001-drivers-define-OPENSSL_API_COMPAT.patch
